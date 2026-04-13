@@ -32,6 +32,11 @@
   let qrFabricImage = null;
   let lastQrDataUrl = "";
 
+  /** pdf.js belgesi (çok sayfalı önizleme) */
+  let pdfJsDocument = null;
+  let pdfPageCount = 0;
+  let pdfCurrentPage = 1;
+
   function sanitizeStorageFileLabel(raw) {
     var s = String(raw || "Belge")
       .normalize("NFD")
@@ -100,6 +105,87 @@
     }
     qrFabricImage = null;
     lastQrDataUrl = "";
+  }
+
+  function clearPdfSession() {
+    pdfJsDocument = null;
+    pdfPageCount = 0;
+    pdfCurrentPage = 1;
+    const bar = document.getElementById("qrPdfPageBar");
+    if (bar) bar.hidden = true;
+  }
+
+  function syncPdfPageUi() {
+    const label = document.getElementById("qrPdfPageLabel");
+    const inp = document.getElementById("qrPdfPageInput");
+    const prev = document.getElementById("qrPdfPagePrev");
+    const next = document.getElementById("qrPdfPageNext");
+    if (!pdfJsDocument || pdfPageCount < 1) return;
+    if (label) {
+      label.textContent =
+        "Sayfa " + pdfCurrentPage + " / " + pdfPageCount;
+    }
+    if (inp) {
+      inp.min = "1";
+      inp.max = String(pdfPageCount);
+      inp.value = String(pdfCurrentPage);
+    }
+    if (prev) prev.disabled = pdfCurrentPage <= 1;
+    if (next) next.disabled = pdfCurrentPage >= pdfPageCount;
+  }
+
+  /**
+   * PDF belgesinin tek bir sayfasını rasterleyip Fabric tuvaline basar.
+   * Sayfa değişince QR sıfırlanır (disposeFabric); karekodu yeniden yerleştirin.
+   */
+  async function renderPdfPageNumber(pageNum, showLoadingOverlay) {
+    if (!pdfJsDocument || pdfPageCount < 1) return;
+    var n = parseInt(pageNum, 10);
+    if (Number.isNaN(n)) n = 1;
+    n = Math.max(1, Math.min(pdfPageCount, n));
+    pdfCurrentPage = n;
+    syncPdfPageUi();
+
+    if (showLoadingOverlay) {
+      setLoading(
+        true,
+        "Sayfa " + n + " / " + pdfPageCount + " yükleniyor…"
+      );
+    }
+    try {
+      const page = await pdfJsDocument.getPage(n);
+      const baseVp = page.getViewport({ scale: 1 });
+      var rasterScale = PDF_MAX_RASTER_WIDTH / baseVp.width;
+      if (baseVp.width * rasterScale < PDF_MIN_RASTER_WIDTH) {
+        rasterScale = PDF_MIN_RASTER_WIDTH / baseVp.width;
+      }
+      rasterScale = Math.min(rasterScale, 3.25);
+      const viewport = page.getViewport({ scale: rasterScale });
+
+      const tmp = document.createElement("canvas");
+      const ctx = tmp.getContext("2d", { alpha: false });
+      if (!ctx) {
+        throw new Error("Tarayıcı canvas 2D desteklemiyor.");
+      }
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      tmp.width = Math.floor(viewport.width);
+      tmp.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+      const bgDataUrl = tmp.toDataURL("image/png");
+      await openImageDataUrlAsFabricBackground(
+        bgDataUrl,
+        viewport.width,
+        viewport.height
+      );
+    } finally {
+      if (showLoadingOverlay) {
+        setLoading(false);
+      }
+    }
   }
 
   function buildPdfBlobFromFabric(fc) {
@@ -250,36 +336,23 @@
       PDF_JS_VER +
       "/pdf.worker.min.js";
 
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-    const page = await pdf.getPage(1);
-    const baseVp = page.getViewport({ scale: 1 });
-    /* Önceki: scale max 1 → ~595px genişlik, bulanık önizleme. Hedef: 1280–2400px raster. */
-    var rasterScale = PDF_MAX_RASTER_WIDTH / baseVp.width;
-    if (baseVp.width * rasterScale < PDF_MIN_RASTER_WIDTH) {
-      rasterScale = PDF_MIN_RASTER_WIDTH / baseVp.width;
-    }
-    rasterScale = Math.min(rasterScale, 3.25);
-    const viewport = page.getViewport({ scale: rasterScale });
+    clearPdfSession();
 
-    const tmp = document.createElement("canvas");
-    const ctx = tmp.getContext("2d", { alpha: false });
-    if (!ctx) {
-      throw new Error("Tarayıcı canvas 2D desteklemiyor.");
-    }
-    ctx.imageSmoothingEnabled = true;
-    if ("imageSmoothingQuality" in ctx) {
-      ctx.imageSmoothingQuality = "high";
-    }
-    tmp.width = Math.floor(viewport.width);
-    tmp.height = Math.floor(viewport.height);
-    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
-    const bgDataUrl = tmp.toDataURL("image/png");
-    await openImageDataUrlAsFabricBackground(
-      bgDataUrl,
-      viewport.width,
-      viewport.height
+    const dataCopy = new Uint8Array(
+      arrayBuffer instanceof ArrayBuffer
+        ? arrayBuffer.slice(0)
+        : arrayBuffer
     );
+    pdfJsDocument = await pdfjs.getDocument({ data: dataCopy }).promise;
+    pdfPageCount = pdfJsDocument.numPages || 0;
+
+    const bar = document.getElementById("qrPdfPageBar");
+    if (bar) bar.hidden = pdfPageCount < 1;
+
+    pdfCurrentPage = 1;
+    syncPdfPageUi();
+
+    await renderPdfPageNumber(1, false);
   }
 
   async function snapshotDocxToCanvas(arrayBuffer) {
@@ -404,6 +477,8 @@
         setLoading(false);
         return;
       }
+
+      clearPdfSession();
 
       if (ext === "docx") {
         setLoading(true, "Word belgesi görüntüye dönüştürülüyor…");
@@ -735,11 +810,50 @@
     });
   }
 
+  function wirePdfPageControls() {
+    const prev = document.getElementById("qrPdfPagePrev");
+    const next = document.getElementById("qrPdfPageNext");
+    const inp = document.getElementById("qrPdfPageInput");
+
+    function reportPdfNavError(err) {
+      window.alert(err && err.message ? err.message : String(err));
+    }
+
+    if (prev) {
+      prev.addEventListener("click", function () {
+        if (pdfCurrentPage > 1) {
+          renderPdfPageNumber(pdfCurrentPage - 1, true).catch(reportPdfNavError);
+        }
+      });
+    }
+    if (next) {
+      next.addEventListener("click", function () {
+        if (pdfCurrentPage < pdfPageCount) {
+          renderPdfPageNumber(pdfCurrentPage + 1, true).catch(reportPdfNavError);
+        }
+      });
+    }
+    if (inp) {
+      function goToInputPage() {
+        var v = parseInt(String(inp.value || "1"), 10);
+        renderPdfPageNumber(v, true).catch(reportPdfNavError);
+      }
+      inp.addEventListener("change", goToInputPage);
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          goToInputPage();
+        }
+      });
+    }
+  }
+
   function init() {
     assignNewQrFileName();
     fillDefaultQrReportDates();
 
     wireDropZone();
+    wirePdfPageControls();
 
     const addBtn = document.getElementById("qrAddBtn");
     const completeBtn = document.getElementById("qrCompleteBtn");

@@ -9,88 +9,136 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="./css/login.css" />
+  <link rel="preload" href="./assets/login-hero.jpg" as="image" />
 </head>
 <body class="login-page">
-  <div class="login-shell">
-    <section class="login-hero" aria-labelledby="loginHeroTitle">
-      <div class="login-hero__mesh" aria-hidden="true"></div>
-      <div class="login-hero__waves" aria-hidden="true">
-        <div class="login-hero__wave login-hero__wave--3"></div>
-        <div class="login-hero__wave login-hero__wave--2"></div>
-        <div class="login-hero__wave login-hero__wave--1"></div>
-      </div>
-      <div class="login-hero__content">
-        <div class="login-hero__orb" aria-hidden="true"></div>
-        <p class="login-hero__eyebrow">3N Makine</p>
-        <h1 id="loginHeroTitle" class="login-hero__title">Yönetim paneline hoş geldiniz</h1>
-        <p class="login-hero__subtitle">
-          Raporlar, şirket kayıtları ve QR işlemleri tek yerden. Güvenli oturum için bilgilerinizi girin.
-        </p>
-      </div>
-    </section>
+  <div class="login-page__grid" aria-hidden="true"></div>
 
-    <section class="login-panel" aria-labelledby="loginHeading">
-      <div class="login-card">
-        <div class="login-card__brand">
-          <div class="login-card__logo" aria-hidden="true">
-            <i class="fa-solid fa-gears"></i>
-          </div>
-          <div class="login-card__titles">
-            <h2 id="loginHeading" class="login-card__heading">Oturum aç</h2>
-            <p class="login-card__hint">Devam etmek için kullanıcı adı ve şifrenizi yazın.</p>
-          </div>
+  <header class="login-header">
+    <a class="login-header__logo" href="./login.html">3N MAKINE</a>
+  </header>
+
+  <main class="login-main">
+    <div class="login-frame">
+      <div class="login-frame__visual" aria-hidden="false">
+        <div
+          class="login-frame__photo"
+          role="img"
+          aria-label="Metal torna tezgahı — endüstriyel üretim"
+        ></div>
+        <div class="login-frame__photo-tint"></div>
+        <div class="login-frame__glass">
+          <p class="login-frame__glass-eyebrow">
+            <span class="login-frame__glass-icon" aria-hidden="true"><i class="fa-solid fa-gears"></i></span>
+            Torna &amp; hassas işleme
+          </p>
+          <p class="login-frame__glass-title">Her dönüşte mühendislik disiplini.</p>
         </div>
+      </div>
 
-        <form id="loginForm" class="login-form" novalidate>
-          <div class="login-field">
-            <label for="loginEmail">Kullanıcı adı veya e-posta</label>
-            <input
-              type="text"
-              id="loginEmail"
-              name="email"
-              autocomplete="username"
-              placeholder="örnek@firma.com"
-              required
-            />
-          </div>
-          <div class="login-field login-field--password">
-            <label for="loginPassword">Şifre</label>
-            <div class="login-password-wrap">
-              <input
-                type="password"
-                id="loginPassword"
-                name="password"
-                class="login-password-input"
-                autocomplete="current-password"
-                placeholder="Şifrenizi girin"
-                required
-              />
-              <button
-                type="button"
-                class="login-password-toggle"
-                id="loginPasswordToggle"
-                aria-label="Şifreyi göster"
-                aria-pressed="false"
-                title="Şifreyi göster"
-              >
-                <i class="fa-regular fa-eye" aria-hidden="true"></i>
+      <section class="login-frame__panel" aria-labelledby="loginHeading">
+        <div class="login-frame__panel-inner">
+          <h1 id="loginHeading" class="login-welcome">Tekrar hoş geldiniz.</h1>
+          <p class="login-welcome__sub">
+            Endüstriyel yönetim panelinize ve rapor akışınıza güvenli erişim sağlayın.
+          </p>
+
+          <form id="loginForm" class="login-form" novalidate>
+            <div class="login-field">
+              <label class="login-label" for="loginEmail">E-posta adresi</label>
+              <div class="login-input-shell">
+                <span class="login-input-shell__icon" aria-hidden="true"><i class="fa-solid fa-at"></i></span>
+                <input
+                  type="text"
+                  id="loginEmail"
+                  name="email"
+                  class="login-input-shell__control"
+                  autocomplete="username"
+                  placeholder="name@3nmakine.com"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="login-field">
+              <div class="login-label-row">
+                <label class="login-label" for="loginPassword">Şifre</label>
+                <a href="#" class="login-forgot" tabindex="0">Erişimi unuttunuz mu?</a>
+              </div>
+              <div class="login-input-shell">
+                <span class="login-input-shell__icon" aria-hidden="true"><i class="fa-solid fa-lock"></i></span>
+                <input
+                  type="password"
+                  id="loginPassword"
+                  name="password"
+                  class="login-input-shell__control login-password-input"
+                  autocomplete="current-password"
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  class="login-password-toggle"
+                  id="loginPasswordToggle"
+                  aria-label="Şifreyi göster"
+                  aria-pressed="false"
+                  title="Şifreyi göster"
+                >
+                  <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+
+            <label class="login-remember">
+              <input type="checkbox" id="loginRemember" name="remember" class="login-remember__input" />
+              <span class="login-remember__box" aria-hidden="true"></span>
+              <span class="login-remember__text">30 gün boyunca oturumu açık tut</span>
+            </label>
+
+            <p id="loginError" class="login-error" role="alert" hidden></p>
+
+            <button type="submit" class="login-submit">
+              <span>Sistemlere giriş yap</span>
+              <i class="fa-solid fa-arrow-right login-submit__icon" aria-hidden="true"></i>
+            </button>
+          </form>
+
+          <div class="login-enterprise">
+            <p class="login-enterprise__label">Kurumsal erişim</p>
+            <div class="login-enterprise__btns">
+              <button type="button" class="login-enterprise__btn" id="loginSsoPlaceholder" disabled title="Yakında">
+                <i class="fa-solid fa-building" aria-hidden="true"></i> SSO ile giriş
+              </button>
+              <button type="button" class="login-enterprise__btn" id="loginFidoPlaceholder" disabled title="Yakında">
+                <i class="fa-solid fa-key" aria-hidden="true"></i> FIDO anahtar
               </button>
             </div>
           </div>
+        </div>
+      </section>
+    </div>
+  </main>
 
-          <p id="loginError" class="login-error" role="alert" hidden></p>
+  <footer class="login-footer">
+    <div class="login-footer__block">
+      <p class="login-footer__copy">
+        3N MAKINE · © <span id="loginYear"></span> 3N Makine Endüstriyel Sistemler. Tüm hakları saklıdır.
+      </p>
+      <p class="login-footer__credit">
+        Sol panel görseli: Unsplash (metal torna / işleme).
+      </p>
+    </div>
+    <nav class="login-footer__links" aria-label="Alt bağlantılar">
+      <a href="#">Gizlilik</a>
+      <a href="#">Kullanım koşulları</a>
+      <a href="#">Güvenlik</a>
+      <a href="#">İletişim</a>
+    </nav>
+  </footer>
 
-          <button type="submit" class="login-submit">
-            <span>Giriş yap</span>
-            <i class="fa-solid fa-arrow-right login-submit__icon" aria-hidden="true"></i>
-          </button>
-        </form>
-
-        <p class="login-footer">3N Makine · Yönetim paneli</p>
-      </div>
-    </section>
-  </div>
-
+  <script>
+    document.getElementById("loginYear").textContent = new Date().getFullYear();
+  </script>
   <script src="./js/login.js"></script>
 </body>
 </html>

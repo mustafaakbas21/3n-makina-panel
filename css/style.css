@@ -1924,6 +1924,100 @@ a.sidebar__logout {
   color: var(--text-muted);
 }
 
+.qr-studio-pdf-pages {
+  margin-bottom: 0.75rem;
+}
+
+.qr-studio-pdf-pages[hidden] {
+  display: none !important;
+}
+
+.qr-studio-pdf-pages__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem 1rem;
+  padding: 0.65rem 1rem;
+  border-radius: 12px;
+  background: #f1f5f9;
+  border: 1px solid var(--sidebar-border, #e2e8f0);
+}
+
+.qr-studio-pdf-pages__nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text, #0f172a);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.qr-studio-pdf-pages__nav:hover:not(:disabled) {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+  color: #1d4ed8;
+}
+
+.qr-studio-pdf-pages__nav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.qr-studio-pdf-pages__label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text, #0f172a);
+  min-width: 7.5rem;
+  text-align: center;
+}
+
+.qr-studio-pdf-pages__goto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+}
+
+.qr-studio-pdf-pages__goto-hint {
+  font-weight: 600;
+}
+
+.qr-studio-pdf-pages__input {
+  width: 4rem;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.qr-studio-pdf-pages__input:focus {
+  outline: none;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.qr-studio-pdf-pages__hint {
+  margin: 0.5rem 0 0;
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-muted, #64748b);
+  text-align: center;
+}
+
 .qr-studio-canvas-wrap {
   overflow: auto;
   max-width: 100%;

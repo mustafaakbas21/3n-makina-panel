@@ -215,6 +215,39 @@
 
             <div class="qr-studio-canvas-section">
               <h2 class="qr-studio-canvas-title">Önizleme tuvali</h2>
+              <div
+                id="qrPdfPageBar"
+                class="qr-studio-pdf-pages"
+                hidden
+                role="navigation"
+                aria-label="PDF sayfa seçimi"
+                title="Sayfa değiştiğinde karekodu yeniden yerleştirmeniz gerekir"
+              >
+                <div class="qr-studio-pdf-pages__inner">
+                  <button type="button" id="qrPdfPagePrev" class="qr-studio-pdf-pages__nav" aria-label="Önceki sayfa">
+                    <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                  </button>
+                  <span class="qr-studio-pdf-pages__label" id="qrPdfPageLabel">Sayfa 1 / 1</span>
+                  <label class="qr-studio-pdf-pages__goto">
+                    <span class="qr-studio-pdf-pages__goto-hint">Git:</span>
+                    <input
+                      type="number"
+                      id="qrPdfPageInput"
+                      class="qr-studio-pdf-pages__input"
+                      min="1"
+                      step="1"
+                      value="1"
+                      aria-label="Sayfa numarası"
+                    />
+                  </label>
+                  <button type="button" id="qrPdfPageNext" class="qr-studio-pdf-pages__nav" aria-label="Sonraki sayfa">
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                  </button>
+                </div>
+                <p class="qr-studio-pdf-pages__hint">
+                  Başka bir sayfaya geçtiğinizde karekod tuvalden kalkar; yeni sayfada tekrar «Karekodu Yerleştir» kullanın.
+                </p>
+              </div>
               <div class="qr-studio-canvas-wrap">
                 <canvas id="pdfCanvas" width="800" height="1000" aria-label="Belge önizlemesi ve karekod"></canvas>
               </div>
