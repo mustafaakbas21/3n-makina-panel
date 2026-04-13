@@ -72,6 +72,66 @@
     return ext ? ext.toUpperCase() : "—";
   }
 
+  /**
+   * Appwrite Storage file view URL → bucketId + fileId (silme için).
+   * Örn. .../v1/storage/buckets/BUCKET/files/FILE_ID/view?...
+   */
+  function parseAppwriteStorageFileFromViewUrl(url) {
+    if (!url || typeof url !== "string") return null;
+    const m = url.match(/\/storage\/buckets\/([^/]+)\/files\/([^/?#]+)/i);
+    if (!m) return null;
+    return { bucketId: m[1], fileId: m[2] };
+  }
+
+  function sanitizeStorageFileLabel(raw) {
+    var s = String(raw || "Belge")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
+    if (!s) s = "Belge";
+    return s.slice(0, 72);
+  }
+
+  /** İndirme ile kaydedilecek dosya adı: 3N_Makina_Raporu_{şirket|başlık}.pdf */
+  function friendlyDownloadFilenameForRow(row) {
+    var company = companyNameForReport(row);
+    var base =
+      company && company !== "—"
+        ? company
+        : rowVal(row, ["title"]) || "Belge";
+    return "3N_Makina_Raporu_" + sanitizeStorageFileLabel(base) + ".pdf";
+  }
+
+  function triggerPdfDownload(url, filename) {
+    fetch(url, { mode: "cors", credentials: "include" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.blob();
+      })
+      .then(function (blob) {
+        var a = document.createElement("a");
+        var u = URL.createObjectURL(blob);
+        a.href = u;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(u);
+      })
+      .catch(function () {
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+  }
+
   function getSelectedCompanyId() {
     const sel = document.getElementById("reportCompanyFilter");
     return sel ? String(sel.value || "").trim() : "";
@@ -134,6 +194,8 @@
         const fileType = fileTypeLabel(pdfUrl);
 
         const downloadDisabled = !pdfUrl || String(pdfUrl).trim() === "";
+        const downloadName = friendlyDownloadFilenameForRow(row);
+        const downloadNameAttr = escapeHtml(downloadName);
 
         return (
           "<tr data-report-id=\"" +
@@ -155,13 +217,24 @@
           escapeHtml(fileType) +
           "</td>" +
           "<td class=\"data-table__actions\">" +
-          "<button type=\"button\" class=\"download-btn\"" +
           (downloadDisabled
-            ? " disabled"
-            : " data-download-url=\"" + urlAttr + "\"") +
-          ">" +
-          "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
-          "</button>" +
+            ? "<span class=\"download-btn download-btn--disabled\" aria-disabled=\"true\">" +
+              "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
+              "</span>"
+            : "<a class=\"download-btn\" href=\"" +
+              urlAttr +
+              "\" download=\"" +
+              downloadNameAttr +
+              "\" rel=\"noopener noreferrer\">" +
+              "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
+              "</a>") +
+          (id
+            ? "<button type=\"button\" class=\"delete-report-btn\" data-document-id=\"" +
+              id +
+              "\" title=\"Raporu sil\">" +
+              "<i class=\"fa-solid fa-trash\" aria-hidden=\"true\"></i> Sil" +
+              "</button>"
+            : "") +
           "</td>" +
           "</tr>"
         );
@@ -340,14 +413,26 @@
     }
 
     const file = pendingUploadFile;
-    const fileId = aw.ID.unique();
+    var companyLabel = "Belge";
+    if (companyId && companyId.selectedIndex >= 0) {
+      var opt = companyId.options[companyId.selectedIndex];
+      if (opt && opt.textContent) {
+        companyLabel = opt.textContent.trim() || "Belge";
+      }
+    }
+    var storageFileId =
+      "3N_Makina_Raporu_" +
+      sanitizeStorageFileLabel(companyLabel) +
+      "_" +
+      Date.now() +
+      ".pdf";
 
     if (submitBtn) submitBtn.disabled = true;
 
     var publicUrl = "";
     try {
-      await aw.storage.createFile(aw.BUCKET_REPORTS, fileId, file);
-      publicUrl = aw.getStorageFileViewUrl(aw.BUCKET_REPORTS, fileId);
+      await aw.storage.createFile(aw.BUCKET_REPORTS, storageFileId, file);
+      publicUrl = aw.getStorageFileViewUrl(aw.BUCKET_REPORTS, storageFileId);
     } catch (uploadError) {
       window.alert(
         "Dosya yüklenemedi:\n" +
@@ -519,15 +604,79 @@
     });
   }
 
-  function wireDownloads() {
+  async function deleteReportDocument(documentId, triggerBtn) {
+    const aw = getAw();
+    if (!aw || !aw.databases || !aw.isConfigured()) {
+      window.alert("Appwrite yapılandırması eksik.");
+      return;
+    }
+
+    const row = reportsCache.find(function (r) {
+      return String(r.id) === String(documentId);
+    });
+    const pdfUrl = row ? rowVal(row, ["pdfUrl", "pdf_url"]) : "";
+
+    if (triggerBtn) triggerBtn.disabled = true;
+
+    try {
+      await aw.databases.deleteDocument(
+        aw.DATABASE_ID,
+        aw.COLLECTION_REPORTS,
+        documentId
+      );
+
+      reportsCache = reportsCache.filter(function (r) {
+        return String(r.id) !== String(documentId);
+      });
+      applyFiltersAndRender();
+
+      if (pdfUrl && aw.storage) {
+        const parsed = parseAppwriteStorageFileFromViewUrl(String(pdfUrl));
+        if (parsed) {
+          try {
+            await aw.storage.deleteFile(parsed.bucketId, parsed.fileId);
+          } catch (storageErr) {
+            console.warn("Depo dosyası silinemedi (kayıt silindi):", storageErr);
+          }
+        }
+      }
+    } catch (err) {
+      window.alert(
+        "Rapor silinemedi: " +
+          (err && err.message ? err.message : String(err))
+      );
+      if (triggerBtn) triggerBtn.disabled = false;
+    }
+  }
+
+  function wireReportTableActions() {
     const tbody = document.getElementById("reportsTableBody");
     if (!tbody) return;
     tbody.addEventListener("click", function (e) {
+      const delBtn = e.target.closest(".delete-report-btn");
+      if (delBtn) {
+        if (delBtn.disabled) return;
+        const docId = delBtn.getAttribute("data-document-id");
+        if (!docId) return;
+        if (
+          !window.confirm(
+            "Bu raporu kalıcı olarak silmek istiyor musunuz? Veritabanı kaydı ve (varsa) depodaki dosya kaldırılır."
+          )
+        ) {
+          return;
+        }
+        deleteReportDocument(docId, delBtn);
+        return;
+      }
+
       const btn = e.target.closest(".download-btn");
-      if (!btn || btn.disabled) return;
-      const url = btn.getAttribute("data-download-url");
+      if (!btn || btn.classList.contains("download-btn--disabled")) return;
+      const url = btn.getAttribute("href");
       if (!url) return;
-      window.open(url, "_blank");
+      e.preventDefault();
+      const name =
+        btn.getAttribute("download") || "3N_Makina_Raporu.pdf";
+      triggerPdfDownload(url, name);
     });
   }
 
@@ -576,7 +725,7 @@
 
     wireDropZone();
     wireUploadModal();
-    wireDownloads();
+    wireReportTableActions();
     loadReportsPage();
   });
 })();

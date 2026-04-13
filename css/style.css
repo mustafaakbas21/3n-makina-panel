@@ -1610,13 +1610,55 @@ a.sidebar__logout {
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.data-table--reports .download-btn:hover:not(:disabled) {
+.data-table--reports a.download-btn {
+  text-decoration: none;
+  color: var(--accent);
+  box-sizing: border-box;
+}
+
+.data-table--reports .download-btn:hover:not(.download-btn--disabled) {
   background: #dbeafe;
   box-shadow: 0 2px 10px rgba(37, 99, 235, 0.18);
 }
 
-.data-table--reports .download-btn:disabled {
+.data-table--reports .download-btn:disabled,
+.data-table--reports .download-btn--disabled {
   opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.data-table--reports td.data-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.data-table--reports .delete-report-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  border: none;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.data-table--reports .delete-report-btn:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #991b1b;
+  box-shadow: 0 2px 10px rgba(185, 28, 28, 0.15);
+}
+
+.data-table--reports .delete-report-btn:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -1699,13 +1741,13 @@ a.sidebar__logout {
 }
 
 .qr-studio-snapshot-inner--excel .qr-studio-excel-table {
-  font-size: 11px;
+  font-size: 12.5px;
 }
 
 .qr-studio-snapshot-inner--excel .qr-studio-excel-table td,
 .qr-studio-snapshot-inner--excel .qr-studio-excel-table th {
-  border: 1px solid #cbd5e1;
-  padding: 6px 8px;
+  border: 1px solid #94a3b8;
+  padding: 7px 9px;
   text-align: left;
 }
 
@@ -1896,6 +1938,8 @@ a.sidebar__logout {
   max-width: 100%;
   height: auto;
   vertical-align: middle;
+  /* Büyük iç çözünürlük + küçük kutuda gösterim: yumuşak küçültme */
+  image-rendering: auto;
 }
 
 .qr-studio-actions {

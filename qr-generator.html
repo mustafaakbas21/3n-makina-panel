@@ -53,60 +53,6 @@
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
       background: #fff;
     }
-    .qr-repo-save {
-      margin-top: 1.25rem;
-      padding: 1.25rem;
-      border-radius: 12px;
-      border: 2px dashed #c7d2fe;
-      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-      text-align: center;
-    }
-    .qr-repo-save[hidden] {
-      display: none !important;
-    }
-    .qr-repo-save__btn {
-      font-size: 1.05rem;
-      padding: 0.85rem 1.5rem;
-      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.25);
-    }
-    .qr-repo-save__btn:disabled {
-      opacity: 0.85;
-      cursor: not-allowed;
-    }
-    .qr-repo-save__success {
-      margin-top: 1rem;
-      padding: 1rem 1.25rem;
-      border-radius: 10px;
-      background: #ecfdf5;
-      border: 1px solid #6ee7b7;
-      color: #065f46;
-      font-weight: 500;
-      text-align: left;
-    }
-    .qr-repo-save__success[hidden] {
-      display: none !important;
-    }
-    .qr-repo-save__success a {
-      color: #047857;
-      font-weight: 600;
-      text-decoration: underline;
-    }
-    .qr-repo-save__spinner {
-      display: inline-block;
-      width: 1em;
-      height: 1em;
-      border: 2px solid rgba(255, 255, 255, 0.35);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: qr-repo-spin 0.7s linear infinite;
-      vertical-align: -0.15em;
-      margin-right: 0.4em;
-    }
-    @keyframes qr-repo-spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0/dist/iife/sdk.js"></script>
   <script>
@@ -200,7 +146,8 @@
         <div class="main__inner">
           <section class="panel qr-studio-panel">
             <p class="qr-studio__lead">
-              Belgenizi yükleyin; önizleme tuvalinde karekodu konumlandırın. «İşlemi Tamamla» ile yüksek çözünürlüklü PDF oluşturulur, Appwrite’a kaydedilir ve karekod bu dosyanın kalıcı bağlantısını taşır.
+              PDF veya Excel/Word yükleyin; önizleme yüksek çözünürlükte rasterlenir. Karekodu yerleştirdikten sonra köşelerden sürükleyerek <strong>orantılı</strong> büyütüp küçültebilirsiniz (çok küçültmeyin; telefonla okunabilirlik için yaklaşık 2–3 cm kenar önerilir).
+              «İşlemi Tamamla» ile tuvalde gördüğünüz düzen A4 PDF olarak kaydedilir, Appwrite depoya yüklenir ve karekod bu dosyanın kalıcı bağlantısını taşır.
             </p>
 
             <div class="qr-studio-toolbar qr-studio-toolbar--grid">
@@ -280,21 +227,6 @@
               <button type="button" id="qrCompleteBtn" class="btn btn--primary qr-studio-btn qr-studio-btn--primary">
                 <i class="fa-solid fa-circle-check" aria-hidden="true"></i> İşlemi Tamamla
               </button>
-            </div>
-
-            <div id="qrRepoSavePanel" class="qr-repo-save" hidden>
-              <button type="button" id="qrSaveToRepoBtn" class="btn btn--primary qr-repo-save__btn">
-                <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Rapor Deposuna Kaydet
-              </button>
-              <p class="qr-studio__lead" style="margin-top: 0.75rem; margin-bottom: 0; font-size: 0.88rem;">
-                Karekod görseli depoya yüklenir ve aşağıdaki tarih / şirket bilgileriyle rapor listesine eklenir.
-              </p>
-              <div id="qrSaveSuccess" class="qr-repo-save__success" hidden role="status">
-                <span id="qrSaveSuccessText"></span>
-                <div style="margin-top: 0.65rem;">
-                  <a href="./reports.html" id="qrSaveSuccessLink">Rapor Deposu’na git</a>
-                </div>
-              </div>
             </div>
           </section>
         </div>

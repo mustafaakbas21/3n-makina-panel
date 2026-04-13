@@ -12,9 +12,19 @@
   }
 
   const PDF_JS_VER = "3.11.174";
+  /** Ekranda gösterilen tuval genişliği (CSS piksel) */
   const MAX_CANVAS_WIDTH = 920;
+  /** PDF.js: sayfa raster’ı en az bu kadar geniş (net önizleme + PDF için) */
+  const PDF_MIN_RASTER_WIDTH = 1280;
+  const PDF_MAX_RASTER_WIDTH = 2400;
+  /** html2canvas (Word/Excel HTML → görüntü) */
+  const SNAPSHOT_HTML_SCALE = 2.25;
+  /** Fabric → jsPDF: A4 raster çarpanı (Retina tuval ile birlikte çok büyümemesi için ~2–2.5) */
+  const PDF_EXPORT_MULTIPLIER = 2.35;
+  /** QR kaynak görüntüsü (küçültülünce/büyütülünce okunabilir kalsın) */
+  const QR_SOURCE_SIZE = 480;
 
-  /** Yüklemede kullanılacak dosya adı (örn. rapor_1712850123456.pdf) — QR bu URL’yi işaret eder */
+  /** Appwrite Storage dosya kimliği — QR içindeki URL bu adla oluşturulur; yüklemede aynı ad kullanılmalı */
   let currentQrFileName = "";
 
   let fabricCanvas = null;
@@ -22,8 +32,31 @@
   let qrFabricImage = null;
   let lastQrDataUrl = "";
 
+  function sanitizeStorageFileLabel(raw) {
+    var s = String(raw || "Belge")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
+    if (!s) s = "Belge";
+    return s.slice(0, 72);
+  }
+
+  /** Şirket seçimi etiketi (boşsa «Belge») — dosya adı için */
+  function getQrStudioCompanyDisplayName() {
+    var sel = document.getElementById("qrStudioCompany");
+    if (!sel || sel.selectedIndex < 0) return "Belge";
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !String(opt.value || "").trim()) return "Belge";
+    var t = opt.textContent ? opt.textContent.trim() : "Belge";
+    return t || "Belge";
+  }
+
   function assignNewQrFileName() {
-    currentQrFileName = "rapor_" + Date.now() + ".pdf";
+    var firma = sanitizeStorageFileLabel(getQrStudioCompanyDisplayName());
+    currentQrFileName =
+      "3N_Makina_Raporu_" + firma + "_" + Date.now() + ".pdf";
   }
 
   function getPredictedPublicUrl() {
@@ -67,11 +100,13 @@
     }
     qrFabricImage = null;
     lastQrDataUrl = "";
-    setRepoSavePanelVisible(false);
   }
 
   function buildPdfBlobFromFabric(fc) {
-    const imgData = fc.toDataURL({ format: "png", multiplier: 2 });
+    const imgData = fc.toDataURL({
+      format: "png",
+      multiplier: PDF_EXPORT_MULTIPLIER,
+    });
     if (typeof window.jspdf === "undefined" || !window.jspdf.jsPDF) {
       throw new Error("jsPDF yüklenmedi.");
     }
@@ -83,7 +118,7 @@
     });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    pdf.addImage(imgData, "PNG", 0, 0, pageW, pageH, undefined, "FAST");
+    pdf.addImage(imgData, "PNG", 0, 0, pageW, pageH);
     return pdf.output("blob");
   }
 
@@ -132,25 +167,22 @@
     return { firstDate: firstD, reminderDate: remD };
   }
 
-  function dataUrlToBlob(dataUrl) {
-    const arr = dataUrl.split(",");
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) u8arr[n] = bstr.charCodeAt(n);
-    return new Blob([u8arr], { type: mime });
-  }
-
-  function setRepoSavePanelVisible(visible) {
-    const panel = document.getElementById("qrRepoSavePanel");
-    const ok = document.getElementById("qrSaveSuccess");
-    if (panel) panel.hidden = !visible;
-    if (!visible && ok) {
-      ok.hidden = true;
-      const t = document.getElementById("qrSaveSuccessText");
-      if (t) t.textContent = "";
-    }
+  function attachQrStudioFabricHandlers(fc) {
+    if (!fc) return;
+    fc.on("object:scaling", function (e) {
+      var t = e.target;
+      if (t && t.name === "qrOverlay") {
+        t.setCoords();
+        fc.requestRenderAll();
+      }
+    });
+    fc.on("object:modified", function (e) {
+      var t = e.target;
+      if (t && t.name === "qrOverlay") {
+        t.setCoords();
+        fc.requestRenderAll();
+      }
+    });
   }
 
   /**
@@ -174,7 +206,9 @@
         height: vh,
         backgroundColor: "#ffffff",
         preserveObjectStacking: true,
+        enableRetinaScaling: true,
       });
+      attachQrStudioFabricHandlers(fabricCanvas);
 
       fabric.Image.fromURL(
         dataUrl,
@@ -219,13 +253,25 @@
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     const page = await pdf.getPage(1);
     const baseVp = page.getViewport({ scale: 1 });
-    const scale = Math.min(1, MAX_CANVAS_WIDTH / baseVp.width);
-    const viewport = page.getViewport({ scale: scale });
+    /* Önceki: scale max 1 → ~595px genişlik, bulanık önizleme. Hedef: 1280–2400px raster. */
+    var rasterScale = PDF_MAX_RASTER_WIDTH / baseVp.width;
+    if (baseVp.width * rasterScale < PDF_MIN_RASTER_WIDTH) {
+      rasterScale = PDF_MIN_RASTER_WIDTH / baseVp.width;
+    }
+    rasterScale = Math.min(rasterScale, 3.25);
+    const viewport = page.getViewport({ scale: rasterScale });
 
     const tmp = document.createElement("canvas");
-    const ctx = tmp.getContext("2d");
-    tmp.width = viewport.width;
-    tmp.height = viewport.height;
+    const ctx = tmp.getContext("2d", { alpha: false });
+    if (!ctx) {
+      throw new Error("Tarayıcı canvas 2D desteklemiyor.");
+    }
+    ctx.imageSmoothingEnabled = true;
+    if ("imageSmoothingQuality" in ctx) {
+      ctx.imageSmoothingQuality = "high";
+    }
+    tmp.width = Math.floor(viewport.width);
+    tmp.height = Math.floor(viewport.height);
     await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
     const bgDataUrl = tmp.toDataURL("image/png");
@@ -250,7 +296,7 @@
     inner.style.boxSizing = "border-box";
     inner.style.background = "#ffffff";
     inner.style.fontFamily = 'Inter, system-ui, -apple-system, sans-serif';
-    inner.style.fontSize = "13px";
+    inner.style.fontSize = "14px";
     inner.style.lineHeight = "1.55";
     inner.style.color = "#0f172a";
 
@@ -260,10 +306,11 @@
     }
 
     const canvas = await html2canvas(inner, {
-      scale: 1.2,
+      scale: SNAPSHOT_HTML_SCALE,
       useCORS: true,
       logging: false,
       backgroundColor: "#ffffff",
+      letterRendering: true,
     });
     root.innerHTML = "";
     return canvas;
@@ -319,10 +366,13 @@
       html +
       "</div>";
     const inner = root.querySelector(".qr-studio-snapshot-inner");
-    inner.style.width = "960px";
-    inner.style.padding = "20px";
+    inner.style.width = "1100px";
+    inner.style.padding = "24px";
     inner.style.boxSizing = "border-box";
     inner.style.background = "#ffffff";
+    inner.style.fontFamily = 'Inter, system-ui, -apple-system, sans-serif';
+    inner.style.fontSize = "13px";
+    inner.style.color = "#0f172a";
 
     if (typeof html2canvas === "undefined") {
       root.innerHTML = "";
@@ -330,11 +380,12 @@
     }
 
     const canvas = await html2canvas(inner, {
-      scale: 1.05,
+      scale: SNAPSHOT_HTML_SCALE,
       useCORS: true,
       logging: false,
       backgroundColor: "#ffffff",
-      windowWidth: 960,
+      windowWidth: 1100,
+      letterRendering: true,
     });
     root.innerHTML = "";
     return canvas;
@@ -402,11 +453,11 @@
       }
       new QRCode(holder, {
         text: text,
-        width: 200,
-        height: 200,
+        width: QR_SOURCE_SIZE,
+        height: QR_SOURCE_SIZE,
         colorDark: "#0f172a",
         colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.M,
+        correctLevel: QRCode.CorrectLevel.H,
       });
     } catch (e) {
       if (holder.parentNode) document.body.removeChild(holder);
@@ -431,7 +482,7 @@
           if (holder.parentNode) document.body.removeChild(holder);
           reject(e);
         }
-      }, 90);
+      }, 120);
     });
   }
 
@@ -440,6 +491,8 @@
       window.alert("Önce bir belge yükleyin.");
       return;
     }
+
+    assignNewQrFileName();
 
     const url = getPredictedPublicUrl().trim();
     if (!url) {
@@ -474,20 +527,28 @@
           }
           const cw = fabricCanvas.getWidth();
           const ch = fabricCanvas.getHeight();
-          img.scaleToWidth(Math.min(168, cw * 0.22));
+          var targetW = Math.min(200, cw * 0.24);
+          if (targetW < 96) targetW = 96;
+          img.scaleToWidth(targetW);
           img.set({
             left: cw / 2,
             top: ch / 2,
             originX: "center",
             originY: "center",
-            cornerSize: 10,
+            cornerSize: 12,
             transparentCorners: false,
             borderColor: "#2563eb",
             cornerColor: "#2563eb",
             name: "qrOverlay",
+            /* Önbellek devre dışı: köşeden boyutlandırınce bulanık QR önlenir */
+            objectCaching: false,
+            lockUniScaling: true,
+            centeredScaling: true,
+            lockScalingFlip: true,
           });
           fabricCanvas.add(img);
           fabricCanvas.setActiveObject(img);
+          img.setCoords();
           fabricCanvas.requestRenderAll();
           qrFabricImage = img;
           resolve();
@@ -495,101 +556,6 @@
         { crossOrigin: "anonymous" }
       );
     });
-
-    setRepoSavePanelVisible(true);
-    const ok = document.getElementById("qrSaveSuccess");
-    if (ok) ok.hidden = true;
-  }
-
-  async function saveQrToRepository() {
-    if (!lastQrDataUrl) {
-      window.alert("Önce karekodu tuval üzerine ekleyin.");
-      return;
-    }
-
-    const companySel = document.getElementById("qrStudioCompany");
-    const companyId = companySel && companySel.value ? companySel.value.trim() : "";
-    if (!companyId) {
-      window.alert("Kayıt için lütfen şirket seçin.");
-      if (companySel) companySel.focus();
-      return;
-    }
-
-    const titleEl = document.getElementById("qrReportTitle");
-    const reportTitle =
-      titleEl && titleEl.value && titleEl.value.trim()
-        ? titleEl.value.trim()
-        : "QR Stüdyosu kaydı";
-
-    const expiryEl = document.getElementById("qrExpiryDate");
-    const expiryVal = expiryEl && expiryEl.value ? expiryEl.value.trim() : "";
-    if (!expiryVal) {
-      window.alert("Lütfen geçerlilik bitiş tarihini seçin.");
-      if (expiryEl) expiryEl.focus();
-      return;
-    }
-
-    const aw = getAw();
-    if (!aw || !aw.storage || !aw.databases || !aw.isConfigured()) {
-      window.alert("Appwrite yapılandırması eksik. js/appwrite-config.mjs dosyasını kontrol edin.");
-      return;
-    }
-
-    const btn = document.getElementById("qrSaveToRepoBtn");
-    const origHtml = btn ? btn.innerHTML : "";
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML =
-        '<span class="qr-repo-save__spinner" aria-hidden="true"></span> Kaydediliyor…';
-    }
-
-    try {
-      const blob = dataUrlToBlob(lastQrDataUrl);
-      const fileId = aw.ID.unique();
-      const bucketId = aw.STORAGE_BUCKET_ID || aw.BUCKET_REPORTS;
-      const file = aw.blobToFile(blob, "qr_" + fileId + ".png");
-
-      await aw.storage.createFile(bucketId, fileId, file);
-      const publicUrl = aw.getStorageFileViewUrl(bucketId, fileId);
-
-      const insertPayload = {
-        title: reportTitle,
-        companyId: companyId,
-        pdfUrl: publicUrl,
-        expiryDate: expiryVal,
-      };
-
-      await aw.databases.createDocument(
-        aw.DATABASE_ID,
-        aw.COLLECTION_REPORTS,
-        aw.ID.unique(),
-        insertPayload
-      );
-
-      const calDates = getQrCalendarDateValues();
-      if (typeof window.__3nSaveReportCalendarMarkers === "function") {
-        window.__3nSaveReportCalendarMarkers({
-          firstDate: calDates.firstDate,
-          reminderDate: calDates.reminderDate,
-          title: reportTitle,
-        });
-      }
-
-      const okBox = document.getElementById("qrSaveSuccess");
-      const okText = document.getElementById("qrSaveSuccessText");
-      if (okText) {
-        okText.textContent =
-          "Karekod görseli kaydedildi ve rapor listesine eklendi.";
-      }
-      if (okBox) okBox.hidden = false;
-    } catch (e) {
-      window.alert(e && e.message ? e.message : String(e));
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = origHtml;
-      }
-    }
   }
 
   async function completeWorkflow() {
@@ -631,7 +597,10 @@
     }
 
     if (!currentQrFileName) {
-      assignNewQrFileName();
+      window.alert(
+        "Dosya adı oluşturulamadı. Lütfen «Karekodu Yerleştir / Yenile» ile karekodu yeniden ekleyin."
+      );
+      return;
     }
 
     setLoading(true, "PDF oluşturuluyor ve yükleniyor…");
@@ -774,10 +743,8 @@
 
     const addBtn = document.getElementById("qrAddBtn");
     const completeBtn = document.getElementById("qrCompleteBtn");
-    const saveRepoBtn = document.getElementById("qrSaveToRepoBtn");
     if (addBtn) addBtn.addEventListener("click", addQrToCanvas);
     if (completeBtn) completeBtn.addEventListener("click", completeWorkflow);
-    if (saveRepoBtn) saveRepoBtn.addEventListener("click", saveQrToRepository);
 
     loadCompanies().catch(function (e) {
       window.alert(

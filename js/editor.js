@@ -32,11 +32,33 @@ const REPORT_DB_COLUMNS = {
  */
 let currentReportFileName = "";
 
+function sanitizeReportStorageFileLabel(raw) {
+  var s = String(raw || "Belge")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+  if (!s) s = "Belge";
+  return s.slice(0, 72);
+}
+
+function getEditorCompanyDisplayName() {
+  var sel = document.getElementById("companySelect");
+  if (!sel || sel.selectedIndex < 0) return "Belge";
+  var opt = sel.options[sel.selectedIndex];
+  if (!opt || !String(opt.value || "").trim()) return "Belge";
+  var t = opt.textContent ? opt.textContent.trim() : "Belge";
+  return t || "Belge";
+}
+
 /**
  * Yeni benzersiz dosya adı üretir (tahmini URL ile uyum için kayıt/yenileme noktalarında çağrılır).
  */
 function assignNewReportFileName() {
-  currentReportFileName = Date.now() + ".pdf";
+  var firma = sanitizeReportStorageFileLabel(getEditorCompanyDisplayName());
+  currentReportFileName =
+    "3N_Makina_Raporu_" + firma + "_" + Date.now() + ".pdf";
 }
 
 /**
