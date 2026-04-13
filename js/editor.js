@@ -27,8 +27,11 @@ const REPORT_DB_COLUMNS = {
 };
 
 /**
- * Bu oturumdaki bir sonraki yüklemede kullanılacak dosya adı (örn. 1702581234567.pdf).
- * QR kod, yükleme öncesi bu adla getFileView ile hesaplanan görüntüleme URL’sini içerir.
+ * Appwrite Storage fileId (ID.unique) — QR ve getFileView URL’si bu kimlikle uyumludur.
+ */
+let currentReportStorageId = "";
+/**
+ * PDF File.name / indirme için görünen dosya adı (Appwrite fileId değildir).
  */
 let currentReportFileName = "";
 
@@ -56,19 +59,24 @@ function getEditorCompanyDisplayName() {
  * Yeni benzersiz dosya adı üretir (tahmini URL ile uyum için kayıt/yenileme noktalarında çağrılır).
  */
 function assignNewReportFileName() {
+  const aw = getAw();
+  currentReportStorageId =
+    aw && aw.ID && typeof aw.ID.unique === "function"
+      ? aw.ID.unique()
+      : "";
   var firma = sanitizeReportStorageFileLabel(getEditorCompanyDisplayName());
   currentReportFileName =
     "3N_Makina_Raporu_" + firma + "_" + Date.now() + ".pdf";
 }
 
 /**
- * currentReportFileName için Appwrite Storage görüntüleme URL’si (yüklemeden önce tahmin).
+ * currentReportStorageId için Appwrite Storage görüntüleme URL’si (yüklemeden önce tahmin).
  * Gerçek yükleme sonrası URL ile aynı olmalıdır.
  */
 function getPredictedPublicUrlForCurrentReport() {
   const aw = getAw();
-  if (!aw || !currentReportFileName) return "";
-  return aw.getStorageFileViewUrl(aw.BUCKET_REPORT_PDFS, currentReportFileName);
+  if (!aw || !currentReportStorageId) return "";
+  return aw.getStorageFileViewUrl(aw.BUCKET_REPORT_PDFS, currentReportStorageId);
 }
 
 /** Son başarılı kayıttan sonra modal aksiyonları (indir / WhatsApp) */
@@ -1048,7 +1056,7 @@ function applyVentilationTemplate() {
 
 /**
  * Önceden tahmin edilen kesin public PDF URL’si ile tuval üzerine sürüklenebilir QR ekler
- * (dosya adı currentReportFileName; kayıtta aynı ad kullanılır).
+ * (Storage fileId currentReportStorageId; yüklemede aynı kimlik kullanılır).
  */
 function generateQrOnCanvas() {
   if (!canvas) return;
@@ -1383,14 +1391,26 @@ async function saveReportAndUpload() {
     // 1) PDF (blob yükleme + jsPDF.save için aynı örnek)
     const { pdf: pdfDoc, blob: pdfBlob } = buildPdfFromCanvas(canvas);
 
-    // 2) Storage’a yükle — QR ile aynı hedef link için önceden seçilen dosya adı
-    if (!currentReportFileName) {
+    // 2) Storage’a yükle — QR ile aynı hedef link için önceden üretilen fileId
+    if (!currentReportStorageId) {
       assignNewReportFileName();
     }
-    const fileName = currentReportFileName;
-    const pdfFile = aw.blobToFile(pdfBlob, fileName);
-    await aw.storage.createFile(aw.BUCKET_REPORT_PDFS, fileName, pdfFile);
-    const publicUrl = aw.getStorageFileViewUrl(aw.BUCKET_REPORT_PDFS, fileName);
+    if (!currentReportStorageId) {
+      window.alert(
+        "Depo dosya kimliği oluşturulamadı. Appwrite (appwrite-config.mjs) yüklü olmalıdır."
+      );
+      return;
+    }
+    const pdfFile = aw.blobToFile(pdfBlob, currentReportFileName);
+    await aw.storage.createFile(
+      aw.BUCKET_REPORT_PDFS,
+      currentReportStorageId,
+      pdfFile
+    );
+    const publicUrl = aw.getStorageFileViewUrl(
+      aw.BUCKET_REPORT_PDFS,
+      currentReportStorageId
+    );
 
     // 4) Veritabanı belgesi (attribute adları REPORT_DB_COLUMNS ile)
     const insertRow = {};

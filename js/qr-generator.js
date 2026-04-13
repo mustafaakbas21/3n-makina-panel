@@ -24,8 +24,10 @@
   /** QR kaynak görüntüsü (küçültülünce/büyütülünce okunabilir kalsın) */
   const QR_SOURCE_SIZE = 480;
 
-  /** Appwrite Storage dosya kimliği — QR içindeki URL bu adla oluşturulur; yüklemede aynı ad kullanılmalı */
-  let currentQrFileName = "";
+  /** Appwrite Storage fileId (ID.unique, ≤36 karakter) — QR URL ve createFile bu kimliği kullanır */
+  let currentQrStorageId = "";
+  /** İndirme / File.name için görünen PDF adı (özel karakterler sanitize edilir) */
+  let currentQrDisplayFileName = "";
 
   let fabricCanvas = null;
   /** @type {fabric.Image | null} */
@@ -59,15 +61,20 @@
   }
 
   function assignNewQrFileName() {
+    const aw = getAw();
+    currentQrStorageId =
+      aw && aw.ID && typeof aw.ID.unique === "function"
+        ? aw.ID.unique()
+        : "";
     var firma = sanitizeStorageFileLabel(getQrStudioCompanyDisplayName());
-    currentQrFileName =
+    currentQrDisplayFileName =
       "3N_Makina_Raporu_" + firma + "_" + Date.now() + ".pdf";
   }
 
   function getPredictedPublicUrl() {
     const aw = getAw();
-    if (!aw || !currentQrFileName) return "";
-    return aw.getStorageFileViewUrl(aw.BUCKET_REPORTS, currentQrFileName);
+    if (!aw || !currentQrStorageId) return "";
+    return aw.getStorageFileViewUrl(aw.BUCKET_REPORTS, currentQrStorageId);
   }
 
   function getPdfJs() {
@@ -671,9 +678,9 @@
       return;
     }
 
-    if (!currentQrFileName) {
+    if (!currentQrStorageId) {
       window.alert(
-        "Dosya adı oluşturulamadı. Lütfen «Karekodu Yerleştir / Yenile» ile karekodu yeniden ekleyin."
+        "Depo dosya kimliği oluşturulamadı. Lütfen «Karekodu Yerleştir / Yenile» ile karekodu yeniden ekleyin."
       );
       return;
     }
@@ -682,16 +689,16 @@
 
     try {
       const pdfBlob = buildPdfBlobFromFabric(fabricCanvas);
-      const pdfFile = aw.blobToFile(pdfBlob, currentQrFileName);
+      const pdfFile = aw.blobToFile(pdfBlob, currentQrDisplayFileName);
 
       await aw.storage.createFile(
         aw.BUCKET_REPORTS,
-        currentQrFileName,
+        currentQrStorageId,
         pdfFile
       );
       const publicUrl = aw.getStorageFileViewUrl(
         aw.BUCKET_REPORTS,
-        currentQrFileName
+        currentQrStorageId
       );
 
       const insertPayload = {

@@ -420,18 +420,24 @@
         companyLabel = opt.textContent.trim() || "Belge";
       }
     }
-    var storageFileId =
+    var displayFileName =
       "3N_Makina_Raporu_" +
       sanitizeStorageFileLabel(companyLabel) +
       "_" +
       Date.now() +
       ".pdf";
+    var storageFileId = aw.ID.unique();
+    var uploadFile = new File(
+      [await file.arrayBuffer()],
+      displayFileName,
+      { type: file.type || "application/pdf" }
+    );
 
     if (submitBtn) submitBtn.disabled = true;
 
     var publicUrl = "";
     try {
-      await aw.storage.createFile(aw.BUCKET_REPORTS, storageFileId, file);
+      await aw.storage.createFile(aw.BUCKET_REPORTS, storageFileId, uploadFile);
       publicUrl = aw.getStorageFileViewUrl(aw.BUCKET_REPORTS, storageFileId);
     } catch (uploadError) {
       window.alert(
