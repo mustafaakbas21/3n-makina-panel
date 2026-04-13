@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3N Makine — Şirketler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/auth-check.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Ana menü">
+      <div class="sidebar__brand">
+        <div class="sidebar__logo" aria-hidden="true">
+          <i class="fa-solid fa-gears"></i>
+        </div>
+        <span class="sidebar__title">3N Makine</span>
+      </div>
+
+      <nav class="sidebar__nav">
+        <a href="index.html" class="sidebar__link" data-nav="home">
+          <i class="fa-solid fa-house" aria-hidden="true"></i>
+          <span>Ana Sayfa</span>
+        </a>
+        <a href="companies.html" class="sidebar__link" data-nav="companies">
+          <i class="fa-solid fa-building" aria-hidden="true"></i>
+          <span>Şirketler</span>
+        </a>
+        <a href="reports.html" class="sidebar__link" data-nav="reports">
+          <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+          <span>Rapor Deposu</span>
+        </a>
+        <a href="create-report.html" class="sidebar__link" data-nav="create">
+          <i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i>
+          <span>Rapor Oluştur</span>
+        </a>
+        <a href="qr-generator.html" class="sidebar__link" data-nav="qr">
+          <i class="fa-solid fa-qrcode" aria-hidden="true"></i>
+          <span>QR Stüdyosu</span>
+        </a>
+      </nav>
+
+      <div class="sidebar__footer">
+        <a href="#" class="sidebar__logout" id="logoutBtn">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Çıkış Yap</span>
+        </a>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="header">
+        <h1 class="header__welcome">
+          Hoş Geldin, <span class="header__name">Mustafa</span>!
+        </h1>
+        <div class="header__tools">
+          <label class="search" for="headerSearchInput">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="headerSearchInput" placeholder="Ara…" autocomplete="off" />
+          </label>
+          <div class="header__dd-wrap">
+            <button
+              type="button"
+              class="header__notify"
+              id="notifyMenuBtn"
+              aria-label="Bildirimler"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-controls="notifyDropdown"
+            >
+              <i class="fa-solid fa-bell" aria-hidden="true"></i>
+              <span class="header__badge">3</span>
+            </button>
+            <div class="header__dropdown" id="notifyDropdown" role="menu" hidden>
+              <p class="header__dropdown-title">Bildirimler</p>
+              <ul class="header__dropdown-list">
+                <li><span class="header__dropdown-dot"></span> Yeni rapor PDF’i yüklendi</li>
+                <li><span class="header__dropdown-dot"></span> Şirket kaydı güncellendi</li>
+                <li><span class="header__dropdown-dot"></span> Hatırlatma: periyodik denetim</li>
+              </ul>
+            </div>
+          </div>
+          <div class="header__dd-wrap">
+            <button
+              type="button"
+              class="header__user header__user--trigger"
+              id="profileMenuBtn"
+              aria-label="Profil menüsü"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-controls="profileDropdown"
+            >
+              <img
+                class="header__avatar"
+                src="https://ui-avatars.com/api/?name=Mustafa&size=128&background=3b82f6&color=ffffff&bold=true"
+                width="40"
+                height="40"
+                alt=""
+              />
+              <span class="header__user-name">Mustafa</span>
+              <i class="fa-solid fa-chevron-down header__user-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="header__dropdown header__dropdown--profile" id="profileDropdown" role="menu" hidden>
+              <button type="button" class="header__dropdown-item" id="profileSettingsBtn" role="menuitem">
+                <i class="fa-solid fa-gear" aria-hidden="true"></i> Ayarlar
+              </button>
+              <button type="button" class="header__dropdown-item header__dropdown-item--danger" id="profileLogoutBtn" role="menuitem">
+                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Çıkış Yap
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="main__scroll">
+        <div class="main__inner">
+          <section class="panel companies-panel">
+            <div class="companies-toolbar">
+              <label class="search companies-toolbar__search" for="searchInput">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="text" id="searchInput" placeholder="Şirket Ara..." autocomplete="off" />
+              </label>
+              <button type="button" class="btn btn--primary" id="addCompanyBtn">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                Yeni Şirket Ekle
+              </button>
+            </div>
+
+            <div class="table-wrap companies-table-wrap">
+              <table class="data-table" id="companiesTable">
+                <thead>
+                  <tr>
+                    <th>Şirket Adı</th>
+                    <th>Vergi Dairesi</th>
+                    <th>Vergi No</th>
+                    <th>İl / İlçe</th>
+                    <th>Telefon</th>
+                    <th>İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="companiesTableBody">
+                  <tr class="data-table__loading">
+                    <td colspan="6">Yükleniyor…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal-backdrop"
+    id="companyModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="companyModalTitle"
+    hidden
+    style="display: none;"
+  >
+    <div class="modal-card">
+      <div class="modal-card__head">
+        <h2 class="modal-card__title" id="companyModalTitle">Yeni Şirket Ekle</h2>
+        <button type="button" class="modal-card__close" id="companyModalClose" aria-label="Kapat">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <form class="modal-card__body" id="companyForm" novalidate>
+        <div class="form-grid">
+          <div class="form-field form-field--full">
+            <label for="companyName">Şirket Unvanı <span class="form-required">*</span></label>
+            <input type="text" id="companyName" name="companyName" required autocomplete="organization" />
+          </div>
+          <div class="form-field">
+            <label for="taxOffice">Vergi Dairesi</label>
+            <input type="text" id="taxOffice" name="taxOffice" autocomplete="off" />
+          </div>
+          <div class="form-field">
+            <label for="taxNumber">Vergi Numarası</label>
+            <input type="text" id="taxNumber" name="taxNumber" autocomplete="off" />
+          </div>
+          <div class="form-field form-field--full">
+            <label for="cityDistrict">İl ve İlçe</label>
+            <input type="text" id="cityDistrict" name="cityDistrict" autocomplete="address-level1" />
+          </div>
+          <div class="form-field form-field--full">
+            <label for="companyAddress">Tam Adres</label>
+            <textarea id="companyAddress" name="companyAddress" rows="3" autocomplete="street-address"></textarea>
+          </div>
+          <div class="form-field">
+            <label for="contactName">Yetkili Kişi Adı</label>
+            <input type="text" id="contactName" name="contactName" autocomplete="name" />
+          </div>
+          <div class="form-field">
+            <label for="companyPhone">Telefon Numarası</label>
+            <input type="tel" id="companyPhone" name="companyPhone" autocomplete="tel" />
+          </div>
+          <div class="form-field form-field--full">
+            <label for="companyEmail">E-posta Adresi</label>
+            <input type="email" id="companyEmail" name="companyEmail" autocomplete="email" />
+          </div>
+        </div>
+        <div class="modal-card__footer">
+          <button type="button" class="btn btn--ghost" id="cancelCompanyBtn">İptal</button>
+          <button type="button" class="btn btn--primary" id="saveCompanyBtn">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
+  <script>
+    console.log("Appwrite SDK yüklendi");
+  </script>
+  <script type="module" src="js/appwrite-config.mjs"></script>
+  <script defer src="js/script.js"></script>
+  <script defer src="js/companies.js"></script>
+</body>
+</html>

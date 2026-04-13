@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3N Makine — Yönetim Paneli</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/auth-check.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Ana menü">
+      <div class="sidebar__brand">
+        <div class="sidebar__logo" aria-hidden="true">
+          <i class="fa-solid fa-gears"></i>
+        </div>
+        <span class="sidebar__title">3N Makine</span>
+      </div>
+
+      <nav class="sidebar__nav">
+        <a href="index.html" class="sidebar__link" data-nav="home">
+          <i class="fa-solid fa-house" aria-hidden="true"></i>
+          <span>Ana Sayfa</span>
+        </a>
+        <a href="companies.html" class="sidebar__link" data-nav="companies">
+          <i class="fa-solid fa-building" aria-hidden="true"></i>
+          <span>Şirketler</span>
+        </a>
+        <a href="reports.html" class="sidebar__link" data-nav="reports">
+          <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+          <span>Rapor Deposu</span>
+        </a>
+        <a href="create-report.html" class="sidebar__link" data-nav="create">
+          <i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i>
+          <span>Rapor Oluştur</span>
+        </a>
+        <a href="qr-generator.html" class="sidebar__link" data-nav="qr">
+          <i class="fa-solid fa-qrcode" aria-hidden="true"></i>
+          <span>QR Stüdyosu</span>
+        </a>
+      </nav>
+
+      <div class="sidebar__footer">
+        <a href="#" class="sidebar__logout" id="logoutBtn">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Çıkış Yap</span>
+        </a>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="header">
+        <h1 class="header__welcome">
+          Hoş Geldin, <span class="header__name">Mustafa</span>!
+        </h1>
+        <div class="header__tools">
+          <label class="search" for="searchInput">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="searchInput" placeholder="Ara…" autocomplete="off" />
+          </label>
+          <div class="header__dd-wrap">
+            <button
+              type="button"
+              class="header__notify"
+              id="notifyMenuBtn"
+              aria-label="Bildirimler"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-controls="notifyDropdown"
+            >
+              <i class="fa-solid fa-bell" aria-hidden="true"></i>
+              <span class="header__badge">3</span>
+            </button>
+            <div class="header__dropdown" id="notifyDropdown" role="menu" hidden>
+              <p class="header__dropdown-title">Bildirimler</p>
+              <ul class="header__dropdown-list">
+                <li><span class="header__dropdown-dot"></span> Yeni rapor PDF’i yüklendi</li>
+                <li><span class="header__dropdown-dot"></span> Şirket kaydı güncellendi</li>
+                <li><span class="header__dropdown-dot"></span> Hatırlatma: periyodik denetim</li>
+              </ul>
+            </div>
+          </div>
+          <div class="header__dd-wrap">
+            <button
+              type="button"
+              class="header__user header__user--trigger"
+              id="profileMenuBtn"
+              aria-label="Profil menüsü"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-controls="profileDropdown"
+            >
+              <img
+                class="header__avatar"
+                src="https://ui-avatars.com/api/?name=Mustafa&size=128&background=3b82f6&color=ffffff&bold=true"
+                width="40"
+                height="40"
+                alt=""
+              />
+              <span class="header__user-name">Mustafa</span>
+              <i class="fa-solid fa-chevron-down header__user-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="header__dropdown header__dropdown--profile" id="profileDropdown" role="menu" hidden>
+              <button type="button" class="header__dropdown-item" id="profileSettingsBtn" role="menuitem">
+                <i class="fa-solid fa-gear" aria-hidden="true"></i> Ayarlar
+              </button>
+              <button type="button" class="header__dropdown-item header__dropdown-item--danger" id="profileLogoutBtn" role="menuitem">
+                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Çıkış Yap
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="main__scroll">
+        <div class="main__inner">
+          <div class="dashboard-content">
+            <div class="dashboard-left">
+              <div class="stats-grid" aria-label="Özet istatistikler">
+                <article class="stat-card">
+                  <div class="stat-card__icon stat-card__icon--blue" aria-hidden="true">
+                    <i class="fa-solid fa-file-lines"></i>
+                  </div>
+                  <div class="stat-card__body">
+                    <p class="stat-card__label">Toplam rapor</p>
+                    <h3 class="stat-card__value" id="stat-reports">Yükleniyor</h3>
+                  </div>
+                </article>
+                <article class="stat-card">
+                  <div class="stat-card__icon stat-card__icon--green" aria-hidden="true">
+                    <i class="fa-solid fa-building"></i>
+                  </div>
+                  <div class="stat-card__body">
+                    <p class="stat-card__label">Kayıtlı şirket</p>
+                    <h3 class="stat-card__value" id="stat-companies">Yükleniyor</h3>
+                  </div>
+                </article>
+                <article class="stat-card">
+                  <div class="stat-card__icon stat-card__icon--violet" aria-hidden="true">
+                    <i class="fa-solid fa-qrcode"></i>
+                  </div>
+                  <div class="stat-card__body">
+                    <p class="stat-card__label">Okutulan QR</p>
+                    <h3 class="stat-card__value" id="stat-qr">Yükleniyor</h3>
+                  </div>
+                </article>
+              </div>
+
+              <section class="panel panel--table">
+                <h2 class="panel__title">Son eklenen raporlar</h2>
+                <div class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Rapor başlığı</th>
+                        <th>Eklenme tarihi</th>
+                        <th>Durum</th>
+                      </tr>
+                    </thead>
+                    <tbody id="recent-reports-list">
+                      <tr class="data-table__loading">
+                        <td colspan="3">Yükleniyor…</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+
+            <aside class="dashboard-right" aria-label="Takvim ve yaklaşan işler">
+              <section class="widget calendar-widget" aria-labelledby="calMonthLabel">
+                <div class="calendar-widget__toolbar">
+                  <button type="button" class="calendar-widget__nav" id="calPrevBtn" aria-label="Önceki ay">
+                    <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                  </button>
+                  <h3 class="calendar-widget__title" id="calMonthLabel">—</h3>
+                  <button type="button" class="calendar-widget__nav" id="calNextBtn" aria-label="Sonraki ay">
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                  </button>
+                </div>
+                <div class="calendar-widget__weekdays" aria-hidden="true">
+                  <span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span>
+                </div>
+                <div class="calendar-widget__grid" id="calendarGrid"></div>
+                <p class="calendar-widget__legend" id="calendarLegend">
+                  <span class="calendar-legend__item"><span class="calendar-legend__swatch calendar-legend__swatch--first" aria-hidden="true"></span> İlk rapor</span>
+                  <span class="calendar-legend__item"><span class="calendar-legend__swatch calendar-legend__swatch--reminder" aria-hidden="true"></span> Son hatırlatıcı</span>
+                  <span class="calendar-legend__item"><span class="calendar-legend__swatch calendar-legend__swatch--expiry" aria-hidden="true"></span> Geçerlilik bitişi</span>
+                </p>
+              </section>
+
+              <section class="widget upcoming-widget" aria-labelledby="upcomingWidgetTitle">
+                <h3 class="widget__title" id="upcomingWidgetTitle">Yaklaşan denetimler</h3>
+                <p class="widget__subtitle">30 gün içinde bitecek veya süresi dolmuş raporlar</p>
+                <ul class="upcoming-widget__list" id="upcomingList"></ul>
+                <p class="upcoming-widget__empty" id="upcomingEmpty">Henüz rapor kaydı yok.</p>
+              </section>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
+  <script>
+    console.log("Appwrite SDK yüklendi");
+  </script>
+  <script type="module" src="js/appwrite-config.mjs"></script>
+  <script defer src="js/script.js"></script>
+</body>
+</html>

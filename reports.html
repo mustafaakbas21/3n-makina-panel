@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3N Makine — Rapor Deposu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/auth-check.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Ana menü">
+      <div class="sidebar__brand">
+        <div class="sidebar__logo" aria-hidden="true">
+          <i class="fa-solid fa-gears"></i>
+        </div>
+        <span class="sidebar__title">3N Makine</span>
+      </div>
+
+      <nav class="sidebar__nav">
+        <a href="index.html" class="sidebar__link" data-nav="home">
+          <i class="fa-solid fa-house" aria-hidden="true"></i>
+          <span>Ana Sayfa</span>
+        </a>
+        <a href="companies.html" class="sidebar__link" data-nav="companies">
+          <i class="fa-solid fa-building" aria-hidden="true"></i>
+          <span>Şirketler</span>
+        </a>
+        <a href="reports.html" class="sidebar__link" data-nav="reports">
+          <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+          <span>Rapor Deposu</span>
+        </a>
+        <a href="create-report.html" class="sidebar__link" data-nav="create">
+          <i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i>
+          <span>Rapor Oluştur</span>
+        </a>
+        <a href="qr-generator.html" class="sidebar__link" data-nav="qr">
+          <i class="fa-solid fa-qrcode" aria-hidden="true"></i>
+          <span>QR Stüdyosu</span>
+        </a>
+      </nav>
+
+      <div class="sidebar__footer">
+        <a href="#" class="sidebar__logout" id="logoutBtn">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Çıkış Yap</span>
+        </a>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="header">
+        <h1 class="header__welcome">
+          Hoş Geldin, <span class="header__name">Mustafa</span>!
+        </h1>
+        <div class="header__tools">
+          <label class="search" for="searchInput">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="searchInput" placeholder="Ara…" autocomplete="off" />
+          </label>
+          <div class="header__dd-wrap">
+            <button
+              type="button"
+              class="header__notify"
+              id="notifyMenuBtn"
+              aria-label="Bildirimler"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-controls="notifyDropdown"
+            >
+              <i class="fa-solid fa-bell" aria-hidden="true"></i>
+              <span class="header__badge">3</span>
+            </button>
+            <div class="header__dropdown" id="notifyDropdown" role="menu" hidden>
+              <p class="header__dropdown-title">Bildirimler</p>
+              <ul class="header__dropdown-list">
+                <li><span class="header__dropdown-dot"></span> Yeni rapor PDF’i yüklendi</li>
+                <li><span class="header__dropdown-dot"></span> Şirket kaydı güncellendi</li>
+                <li><span class="header__dropdown-dot"></span> Hatırlatma: periyodik denetim</li>
+              </ul>
+            </div>
+          </div>
+          <div class="header__dd-wrap">
+            <button
+              type="button"
+              class="header__user header__user--trigger"
+              id="profileMenuBtn"
+              aria-label="Profil menüsü"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-controls="profileDropdown"
+            >
+              <img
+                class="header__avatar"
+                src="https://ui-avatars.com/api/?name=Mustafa&size=128&background=3b82f6&color=ffffff&bold=true"
+                width="40"
+                height="40"
+                alt=""
+              />
+              <span class="header__user-name">Mustafa</span>
+              <i class="fa-solid fa-chevron-down header__user-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="header__dropdown header__dropdown--profile" id="profileDropdown" role="menu" hidden>
+              <button type="button" class="header__dropdown-item" id="profileSettingsBtn" role="menuitem">
+                <i class="fa-solid fa-gear" aria-hidden="true"></i> Ayarlar
+              </button>
+              <button type="button" class="header__dropdown-item header__dropdown-item--danger" id="profileLogoutBtn" role="menuitem">
+                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Çıkış Yap
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="main__scroll">
+        <div class="main__inner">
+          <section class="panel reports-repo-panel">
+            <div
+              id="dropZone"
+              class="drop-zone"
+              role="button"
+              tabindex="0"
+              aria-label="Dosya yüklemek için tıklayın veya dosyaları buraya sürükleyin"
+            >
+              <input
+                type="file"
+                id="fileInput"
+                class="drop-zone__input"
+                accept=".pdf,.doc,.docx,.xls,.xlsx"
+                aria-hidden="true"
+                tabindex="-1"
+              />
+              <div class="drop-zone__content">
+                <div class="drop-zone__icon" aria-hidden="true">
+                  <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+                <p class="drop-zone__text">
+                  Dosyaları Buraya Sürükleyin veya Seçmek İçin Tıklayın (PDF, Word, Excel)
+                </p>
+              </div>
+            </div>
+
+            <div class="reports-toolbar">
+              <div class="reports-toolbar__field">
+                <label class="reports-toolbar__label" for="reportCompanyFilter">Şirket Seçin</label>
+                <select id="reportCompanyFilter" class="reports-toolbar__select">
+                  <option value="">Tüm şirketler</option>
+                </select>
+              </div>
+              <label class="search reports-toolbar__search" for="reportSearchInput">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input
+                  type="search"
+                  id="reportSearchInput"
+                  placeholder="Rapor ara…"
+                  autocomplete="off"
+                />
+              </label>
+            </div>
+
+            <div class="table-wrap reports-table-wrap">
+              <table id="reportsTable" class="data-table data-table--reports">
+                <thead>
+                  <tr>
+                    <th>Rapor Adı</th>
+                    <th>Şirket</th>
+                    <th>Yüklenme Tarihi</th>
+                    <th>Bitiş / Geçerlilik Tarihi</th>
+                    <th>Dosya Türü</th>
+                    <th class="data-table__actions">İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="reportsTableBody">
+                  <tr class="data-table__loading">
+                    <td colspan="6">Yükleniyor…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal-backdrop"
+    id="reportUploadModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="reportUploadModalTitle"
+    hidden
+    style="display: none;"
+  >
+    <div class="modal-card">
+      <div class="modal-card__head">
+        <h2 class="modal-card__title" id="reportUploadModalTitle">Dosya yükle</h2>
+        <button type="button" class="modal-card__close" id="reportUploadModalClose" aria-label="Kapat">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <form class="modal-card__body" id="reportUploadForm" novalidate>
+        <p class="report-upload-modal__file" id="reportUploadFileLabel"></p>
+        <div class="form-grid">
+          <div class="form-field form-field--full">
+            <label for="uploadModalCompany">Hangi şirkete ait? <span class="form-required">*</span></label>
+            <select id="uploadModalCompany" name="uploadModalCompany" required>
+              <option value="">Şirket seçin…</option>
+            </select>
+          </div>
+          <div class="form-field form-field--full">
+            <label for="uploadModalTitle">Rapor adı <span class="form-required">*</span></label>
+            <input type="text" id="uploadModalTitle" name="uploadModalTitle" required maxlength="200" autocomplete="off" placeholder="Örn. Periyodik kontrol raporu" />
+          </div>
+          <div class="form-field form-field--full">
+            <label for="uploadModalExpiry">Geçerlilik bitiş tarihi (hatırlatıcı) <span class="form-required">*</span></label>
+            <input type="date" id="uploadModalExpiry" name="uploadModalExpiry" required title="Geçerlilik Bitiş Tarihi" />
+          </div>
+        </div>
+        <div class="modal-card__footer">
+          <button type="button" class="btn btn--ghost" id="cancelReportUploadBtn">İptal</button>
+          <button type="submit" class="btn btn--primary" id="submitReportUploadBtn">Yükle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
+  <script>
+    console.log("Appwrite SDK yüklendi");
+  </script>
+  <script type="module" src="js/appwrite-config.mjs"></script>
+  <script defer src="js/script.js"></script>
+  <script defer src="js/reports.js"></script>
+</body>
+</html>

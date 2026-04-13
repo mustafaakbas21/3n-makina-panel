@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3N Makine — Yeni Rapor Oluştur</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/auth-check.js"></script>
+  <style>
+    /* Bu sayfaya özel düzen */
+    .report-page {
+      min-height: 100vh;
+      background: var(--bg-page, #f4f7fe);
+      display: flex;
+      flex-direction: column;
+    }
+    .report-topbar {
+      background: #fff;
+      border-bottom: 1px solid #e8ecf4;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+    }
+    .report-topbar__row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 1rem 1.5rem;
+    }
+    .report-topbar__title {
+      margin: 0 0 0.35rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      width: 100%;
+    }
+    .report-topbar__hint {
+      margin: 0 0 0.75rem;
+      font-size: 0.82rem;
+      color: #64748b;
+      line-height: 1.45;
+      max-width: 72ch;
+    }
+    .report-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      min-width: 200px;
+    }
+    .report-field label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .report-field input,
+    .report-field select {
+      font: inherit;
+      padding: 0.55rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #0f172a;
+      min-width: 220px;
+    }
+    .report-field input:focus,
+    .report-field select:focus {
+      outline: none;
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+      background: #fff;
+    }
+    .report-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 1rem 1.5rem 1.5rem;
+      gap: 1rem;
+      overflow: auto;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .toolbar button {
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.88rem;
+      padding: 0.55rem 0.9rem;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      color: #334155;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .toolbar button:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+    .toolbar button.toolbar__primary {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #fff;
+      border: none;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    }
+    .toolbar button.toolbar__primary:hover {
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
+    }
+    .toolbar button.toolbar__danger {
+      color: #b91c1c;
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+    .toolbar button.toolbar__danger:hover {
+      background: #fee2e2;
+    }
+    .report-canvas-stage {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: visible;
+      padding-bottom: 1.5rem;
+      -webkit-overflow-scrolling: touch;
+    }
+    .canvas-wrap {
+      background: #fff;
+      border-radius: 16px;
+      padding: 1rem 1.15rem 1.25rem;
+      box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 20px 50px -12px rgba(15, 23, 42, 0.1);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      align-self: flex-start;
+      min-width: min(100%, 960px);
+    }
+    .canvas-wrap canvas {
+      display: block;
+      border-radius: 8px;
+      box-shadow: inset 0 0 0 1px #e2e8f0;
+      max-width: none;
+    }
+
+    /* Sonuç modalı — başlangıçta gizli */
+    .result-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .result-modal.is-visible {
+      display: flex;
+    }
+    .result-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(4px);
+    }
+    .result-modal__box {
+      position: relative;
+      max-width: 420px;
+      width: 100%;
+      background: #fff;
+      border-radius: 16px;
+      padding: 1.75rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      text-align: center;
+    }
+    .result-modal__box h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1.15rem;
+      color: #0f172a;
+    }
+    .result-modal__box p {
+      margin: 0 0 1rem;
+      color: #64748b;
+      font-size: 0.95rem;
+    }
+    .result-modal__box a {
+      color: #2563eb;
+      font-weight: 600;
+      word-break: break-all;
+    }
+    #qrcodeArea {
+      display: inline-block;
+      margin: 1rem auto;
+      padding: 0.75rem;
+      background: #f8fafc;
+      border-radius: 12px;
+    }
+    .result-modal__close {
+      margin-top: 0.5rem;
+      font: inherit;
+      font-weight: 600;
+      padding: 0.6rem 1.2rem;
+      border-radius: 10px;
+      border: none;
+      background: #0f172a;
+      color: #fff;
+      cursor: pointer;
+    }
+    .result-modal__close:hover {
+      background: #1e293b;
+    }
+    .result-modal__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      justify-content: center;
+      margin: 1rem 0 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Ana menü">
+      <div class="sidebar__brand">
+        <div class="sidebar__logo" aria-hidden="true">
+          <i class="fa-solid fa-gears"></i>
+        </div>
+        <span class="sidebar__title">3N Makine</span>
+      </div>
+
+      <nav class="sidebar__nav">
+        <a href="index.html" class="sidebar__link" data-nav="home">
+          <i class="fa-solid fa-house" aria-hidden="true"></i>
+          <span>Ana Sayfa</span>
+        </a>
+        <a href="companies.html" class="sidebar__link" data-nav="companies">
+          <i class="fa-solid fa-building" aria-hidden="true"></i>
+          <span>Şirketler</span>
+        </a>
+        <a href="reports.html" class="sidebar__link" data-nav="reports">
+          <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+          <span>Rapor Deposu</span>
+        </a>
+        <a href="create-report.html" class="sidebar__link" data-nav="create">
+          <i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i>
+          <span>Rapor Oluştur</span>
+        </a>
+        <a href="qr-generator.html" class="sidebar__link" data-nav="qr">
+          <i class="fa-solid fa-qrcode" aria-hidden="true"></i>
+          <span>QR Stüdyosu</span>
+        </a>
+      </nav>
+
+      <div class="sidebar__footer">
+        <a href="#" class="sidebar__logout" id="logoutBtn">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Çıkış Yap</span>
+        </a>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="header">
+        <h1 class="header__welcome">
+          Hoş Geldin, <span class="header__name">Mustafa</span>!
+        </h1>
+        <div class="header__tools">
+          <label class="search" for="searchInput">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="searchInput" placeholder="Ara…" autocomplete="off" />
+          </label>
+          <div class="header__dd-wrap">
+            <button
+              type="button"
+              class="header__notify"
+              id="notifyMenuBtn"
+              aria-label="Bildirimler"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-controls="notifyDropdown"
+            >
+              <i class="fa-solid fa-bell" aria-hidden="true"></i>
+              <span class="header__badge">3</span>
+            </button>
+            <div class="header__dropdown" id="notifyDropdown" role="menu" hidden>
+              <p class="header__dropdown-title">Bildirimler</p>
+              <ul class="header__dropdown-list">
+                <li><span class="header__dropdown-dot"></span> Yeni rapor PDF’i yüklendi</li>
+                <li><span class="header__dropdown-dot"></span> Şirket kaydı güncellendi</li>
+                <li><span class="header__dropdown-dot"></span> Hatırlatma: periyodik denetim</li>
+              </ul>
+            </div>
+          </div>
+          <div class="header__dd-wrap">
+            <button
+              type="button"
+              class="header__user header__user--trigger"
+              id="profileMenuBtn"
+              aria-label="Profil menüsü"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-controls="profileDropdown"
+            >
+              <img
+                class="header__avatar"
+                src="https://ui-avatars.com/api/?name=Mustafa&size=128&background=3b82f6&color=ffffff&bold=true"
+                width="40"
+                height="40"
+                alt=""
+              />
+              <span class="header__user-name">Mustafa</span>
+              <i class="fa-solid fa-chevron-down header__user-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="header__dropdown header__dropdown--profile" id="profileDropdown" role="menu" hidden>
+              <button type="button" class="header__dropdown-item" id="profileSettingsBtn" role="menuitem">
+                <i class="fa-solid fa-gear" aria-hidden="true"></i> Ayarlar
+              </button>
+              <button type="button" class="header__dropdown-item header__dropdown-item--danger" id="profileLogoutBtn" role="menuitem">
+                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Çıkış Yap
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="main__scroll">
+        <div class="main__inner">
+          <header class="report-topbar">
+            <h1 class="report-topbar__title">Yeni Rapor Oluştur</h1>
+            <p class="report-topbar__hint">
+              Üstteki <strong>rapor başlığı</strong> PDF meta bilgisidir. Aşağıdaki tuvalde metinlerin çoğu Excel’deki gibi tıklayıp düzenlenebilir; tabloda U / U.D. / N.U. hücrelerine tıklayarak işaretleyin.
+              <strong>QR Kod Oluştur</strong>, yalnızca raporu kaydettikten sonra yüklenen PDF bağlantısını kodlar.
+              Kayıt sonrası <strong>ilk rapor</strong> ve <strong>son hatırlatıcı</strong> tarihleri ana sayfa takviminde işaretlenir; <strong>geçerlilik bitiş tarihi</strong> takvimde kırmızı nokta ve «Yaklaşan denetimler» listesinde kullanılır.
+            </p>
+            <div class="report-topbar__row">
+              <div class="report-field">
+                <label for="reportFirstDate">İlk rapor tarihi</label>
+                <input type="date" id="reportFirstDate" name="reportFirstDate" />
+              </div>
+              <div class="report-field">
+                <label for="reportReminderDate">Son hatırlatıcı tarihi</label>
+                <input type="date" id="reportReminderDate" name="reportReminderDate" />
+              </div>
+              <div class="report-field">
+                <label for="expiryDate">Geçerlilik bitiş tarihi</label>
+                <input type="date" id="expiryDate" name="expiryDate" title="Geçerlilik Bitiş Tarihi" />
+              </div>
+              <div class="report-field">
+                <label for="reportTitle">Rapor başlığı</label>
+                <input type="text" id="reportTitle" name="reportTitle" placeholder="Örn. İSG periyodik denetim" maxlength="200" autocomplete="off" />
+              </div>
+              <div class="report-field">
+                <label for="companySelect">Şirket</label>
+                <select id="companySelect" name="companySelect">
+                  <option value="">Şirket Seçin...</option>
+                </select>
+              </div>
+              <div class="report-field">
+                <label for="templateSelect">Rapor şablonu</label>
+                <select id="templateSelect" name="templateSelect">
+                  <option value="blank">Boş Tuval</option>
+                  <option value="ventilation">Periyodik Kontrol Şablonu</option>
+                </select>
+              </div>
+            </div>
+          </header>
+
+          <main class="report-body">
+            <div class="toolbar" aria-label="Tuval araçları">
+              <button type="button" id="undoCanvasBtn" title="Geri al (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i> Geri Al</button>
+              <button type="button" id="redoCanvasBtn" title="İleri al (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i> İleri Al</button>
+              <button type="button" id="addTextBtn"><i class="fa-solid fa-font"></i> Metin</button>
+              <button type="button" id="addLineBtn"><i class="fa-solid fa-minus"></i> Çizgi</button>
+              <button type="button" id="addRectBtn"><i class="fa-regular fa-square"></i> Kutu</button>
+              <button type="button" class="tool-btn" id="addQrBtn"><i class="fas fa-qrcode"></i> QR Kod Oluştur</button>
+              <button type="button" id="deleteObjBtn" class="toolbar__danger"><i class="fa-solid fa-trash"></i> Seçiliyi sil</button>
+              <button type="button" id="clearCanvasBtn" class="toolbar__danger"><i class="fa-solid fa-eraser"></i> Tuvali temizle</button>
+              <button type="button" id="saveReportBtn" class="toolbar__primary"><i class="fa-solid fa-file-pdf"></i> Raporu Kaydet ve PDF Üret</button>
+            </div>
+
+            <div class="report-canvas-stage">
+            <div class="canvas-wrap">
+              <canvas id="reportCanvas" width="920" height="1680" aria-label="Rapor tasarım tuvali"></canvas>
+            </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- İşlem sonrası: başarı, PDF linki ve QR -->
+  <div id="resultModal" class="result-modal" aria-hidden="true" role="dialog" aria-labelledby="resultModalTitle">
+    <div class="result-modal__backdrop" id="resultModalBackdrop"></div>
+    <div class="result-modal__box">
+      <h2 id="resultModalTitle">Rapor başarıyla kaydedildi</h2>
+      <p>PDF dosyanız bulutta saklandı. Aşağıdaki bağlantıdan erişebilir veya QR ile paylaşabilirsiniz.</p>
+      <p><a id="pdfPublicLink" href="#" target="_blank" rel="noopener noreferrer">PDF’i aç / indir</a></p>
+      <div id="qrcodeArea" aria-label="PDF bağlantısı QR kodu"></div>
+      <div class="result-modal__actions">
+        <button type="button" id="downloadPdfBtn" class="primary-btn">
+          <i class="fas fa-download"></i> Bilgisayara İndir
+        </button>
+        <button type="button" id="sendWhatsappBtn" class="primary-btn whatsapp-btn">
+          <i class="fab fa-whatsapp"></i> WhatsApp'tan Yolla
+        </button>
+      </div>
+      <button type="button" class="result-modal__close" id="closeResultModal">Kapat</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
+  <script>
+    console.log("Appwrite SDK yüklendi");
+  </script>
+  <script type="module" src="js/appwrite-config.mjs"></script>
+  <script defer src="js/script.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script defer src="js/editor.js"></script>
+</body>
+</html>

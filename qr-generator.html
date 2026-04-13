@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3N Makine — QR Stüdyosu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/auth-check.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Ana menü">
+      <div class="sidebar__brand">
+        <div class="sidebar__logo" aria-hidden="true">
+          <i class="fa-solid fa-gears"></i>
+        </div>
+        <span class="sidebar__title">3N Makine</span>
+      </div>
+
+      <nav class="sidebar__nav">
+        <a href="index.html" class="sidebar__link" data-nav="home">
+          <i class="fa-solid fa-house" aria-hidden="true"></i>
+          <span>Ana Sayfa</span>
+        </a>
+        <a href="companies.html" class="sidebar__link" data-nav="companies">
+          <i class="fa-solid fa-building" aria-hidden="true"></i>
+          <span>Şirketler</span>
+        </a>
+        <a href="reports.html" class="sidebar__link" data-nav="reports">
+          <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+          <span>Rapor Deposu</span>
+        </a>
+        <a href="create-report.html" class="sidebar__link" data-nav="create">
+          <i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i>
+          <span>Rapor Oluştur</span>
+        </a>
+        <a href="qr-generator.html" class="sidebar__link sidebar__link--active" data-nav="qr">
+          <i class="fa-solid fa-qrcode" aria-hidden="true"></i>
+          <span>QR Stüdyosu</span>
+        </a>
+      </nav>
+
+      <div class="sidebar__footer">
+        <a href="#" class="sidebar__logout" id="logoutBtn">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Çıkış Yap</span>
+        </a>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="header">
+        <h1 class="header__welcome">QR Kod <span class="header__name">Stüdyosu</span></h1>
+        <div class="header__tools">
+          <label class="search" for="searchInput">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="searchInput" placeholder="Ara…" autocomplete="off" />
+          </label>
+          <div class="header__dd-wrap">
+            <button type="button" class="header__notify" id="notifyMenuBtn" aria-label="Bildirimler" aria-expanded="false" aria-haspopup="true" aria-controls="notifyDropdown">
+              <i class="fa-solid fa-bell" aria-hidden="true"></i>
+              <span class="header__badge">3</span>
+            </button>
+            <div class="header__dropdown" id="notifyDropdown" role="menu" hidden>
+              <p class="header__dropdown-title">Bildirimler</p>
+              <ul class="header__dropdown-list">
+                <li><span class="header__dropdown-dot"></span> Yeni rapor PDF’i yüklendi</li>
+                <li><span class="header__dropdown-dot"></span> Şirket kaydı güncellendi</li>
+                <li><span class="header__dropdown-dot"></span> Hatırlatma: periyodik denetim</li>
+              </ul>
+            </div>
+          </div>
+          <div class="header__dd-wrap">
+            <button type="button" class="header__user header__user--trigger" id="profileMenuBtn" aria-label="Profil menüsü" aria-expanded="false" aria-haspopup="true" aria-controls="profileDropdown">
+              <img class="header__avatar" src="https://ui-avatars.com/api/?name=Mustafa&size=128&background=3b82f6&color=ffffff&bold=true" width="40" height="40" alt="" />
+              <span class="header__user-name">Mustafa</span>
+              <i class="fa-solid fa-chevron-down header__user-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="header__dropdown header__dropdown--profile" id="profileDropdown" role="menu" hidden>
+              <button type="button" class="header__dropdown-item" id="profileSettingsBtn" role="menuitem">
+                <i class="fa-solid fa-gear" aria-hidden="true"></i> Ayarlar
+              </button>
+              <button type="button" class="header__dropdown-item header__dropdown-item--danger" id="profileLogoutBtn" role="menuitem">
+                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Çıkış Yap
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="main__scroll">
+        <div class="main__inner">
+          <section class="panel qr-studio-panel">
+            <p class="qr-studio__lead">
+              Belgenizi yükleyin; önizleme tuvalinde karekodu konumlandırın. «İşlemi Tamamla» ile yüksek çözünürlüklü PDF oluşturulur, Appwrite’a kaydedilir ve karekod bu dosyanın kalıcı bağlantısını taşır.
+            </p>
+
+            <div class="qr-studio-toolbar qr-studio-toolbar--grid">
+              <div class="qr-studio-field">
+                <label class="qr-studio-label" for="qrStudioCompany">Şirket</label>
+                <select id="qrStudioCompany" class="qr-studio-select">
+                  <option value="">Şirket seçin…</option>
+                </select>
+              </div>
+              <div class="qr-studio-field">
+                <label class="qr-studio-label" for="qrReportTitle">Rapor başlığı</label>
+                <input type="text" id="qrReportTitle" class="qr-studio-input" maxlength="200" placeholder="Örn. Periyodik kontrol özeti" autocomplete="off" />
+              </div>
+            </div>
+
+            <div
+              id="qrDropZone"
+              class="qr-studio-drop"
+              role="button"
+              tabindex="0"
+              aria-label="Dosya yüklemek için tıklayın veya sürükleyin"
+            >
+              <input
+                type="file"
+                id="qrFileInput"
+                class="qr-studio-drop__input"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                aria-hidden="true"
+                tabindex="-1"
+              />
+              <div class="qr-studio-drop__inner">
+                <div class="qr-studio-drop__icon" aria-hidden="true"><i class="fa-solid fa-file-import"></i></div>
+                <p class="qr-studio-drop__text">
+                  Dosyayı buraya sürükleyin veya seçmek için tıklayın<br />
+                  <span class="qr-studio-drop__hint">PDF · Word (.docx) · Excel</span>
+                </p>
+              </div>
+            </div>
+
+            <div id="qrSnapshotRoot" class="qr-studio-snapshot-root" aria-hidden="true"></div>
+
+            <div id="qrLoadingOverlay" class="qr-studio-loading" hidden aria-live="polite" aria-busy="true">
+              <div class="qr-studio-loading__card">
+                <div class="qr-studio-spinner" aria-hidden="true"></div>
+                <p id="qrLoadingMessage" class="qr-studio-loading__text">Yükleniyor…</p>
+              </div>
+            </div>
+
+            <div class="qr-studio-canvas-section">
+              <h2 class="qr-studio-canvas-title">Önizleme tuvali</h2>
+              <div class="qr-studio-canvas-wrap">
+                <canvas id="pdfCanvas" width="800" height="1000" aria-label="Belge önizlemesi ve karekod"></canvas>
+              </div>
+            </div>
+
+            <div class="qr-studio-actions">
+              <button type="button" id="qrAddBtn" class="btn btn--ghost qr-studio-btn">
+                <i class="fa-solid fa-qrcode" aria-hidden="true"></i> Karekodu Yerleştir / Yenile
+              </button>
+              <button type="button" id="qrCompleteBtn" class="btn btn--primary qr-studio-btn qr-studio-btn--primary">
+                <i class="fa-solid fa-circle-check" aria-hidden="true"></i> İşlemi Tamamla
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
+  <script>
+    console.log("Appwrite SDK yüklendi");
+  </script>
+  <script type="module" src="js/appwrite-config.mjs"></script>
+  <script defer src="js/script.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script defer src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script defer src="js/qr-generator.js"></script>
+</body>
+</html>
