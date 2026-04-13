@@ -1,24 +1,28 @@
 /**
- * 3N Makine — Appwrite (tek yapılandırma; tüm sayfa script’leri window.__3nAppwrite kullanır)
+ * 3N Makine — Appwrite (tek modül, yerel import yok)
  *
- * Ortak istemci: lib/appwrite.js (global Appwrite CDN). Sayfa açılışında arka uç doğrulaması için
- * `client.ping()` otomatik çağrılır; sonuç konsolda görünür.
- *
- * Koleksiyon ve bucket ID’lerini Appwrite konsolundan alıp burada güncelleyin.
+ * CDN script’i (window.Appwrite) bu dosyadan önce yüklenmelidir.
+ * Koleksiyon / bucket ID’lerini Appwrite konsolundan alıp burada güncelleyin.
  */
-import { client, account, databases } from "../lib/appwrite.js";
+const AppwriteGlobal =
+  (typeof globalThis !== "undefined" && globalThis.Appwrite) ||
+  (typeof window !== "undefined" && window.Appwrite) ||
+  null;
 
-const Aw =
-  typeof globalThis !== "undefined" && globalThis.Appwrite
-    ? globalThis.Appwrite
-    : null;
-if (!Aw || !Aw.Storage) {
+if (!AppwriteGlobal || !AppwriteGlobal.Client) {
   throw new Error(
-    "Appwrite SDK yüklenmedi. Appwrite CDN script’i appwrite-config’ten önce eklenmelidir."
+    "Appwrite SDK yüklenmedi. HTML içinde Appwrite CDN script’i, type=module satırından önce olmalıdır."
   );
 }
-const { Storage, ID, Query } = Aw;
 
+const { Client, Account, Databases, Storage, ID, Query } = AppwriteGlobal;
+
+const client = new Client()
+  .setEndpoint("https://fra.cloud.appwrite.io/v1")
+  .setProject("69dcde32001b4de0d04e");
+
+const account = new Account(client);
+const databases = new Databases(client);
 const storage = new Storage(client);
 
 const DATABASE_ID = "69dcdeff0008deb14b78";

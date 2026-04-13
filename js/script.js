@@ -6,6 +6,13 @@
 
 var SESSION_USER_KEY = "3n_session_user";
 
+/** Önce tanımlanmalı — bildirim/arama HTML kaçırma */
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text == null ? "" : String(text);
+  return div.innerHTML;
+}
+
 function getAw() {
   return typeof window.__3nAppwrite !== "undefined" && window.__3nAppwrite
     ? window.__3nAppwrite
@@ -39,15 +46,19 @@ function applySessionUserToHeader() {
     const nameSpan = welcome.querySelector(".header__name");
     if (nameSpan) nameSpan.textContent = display;
   }
-  document.querySelectorAll(".header__user-name").forEach(function (el) {
-    el.textContent = display;
-  });
-  document.querySelectorAll(".header__avatar").forEach(function (img) {
+  var i;
+  var names = document.querySelectorAll(".header__user-name");
+  for (i = 0; i < names.length; i++) {
+    names[i].textContent = display;
+  }
+  var avs = document.querySelectorAll(".header__avatar");
+  for (i = 0; i < avs.length; i++) {
+    var img = avs[i];
     if (img && img.tagName === "IMG") {
       img.src = avatarUrlForName(display);
       img.alt = display;
     }
-  });
+  }
 }
 
 /** Üst arama + bildirimler için tek seferlik önbellek */
@@ -56,7 +67,12 @@ var headerDataCache = null;
 async function ensureHeaderDataCache() {
   if (headerDataCache) return headerDataCache;
   const aw = getAw();
-  if (!aw || !aw.databases || !aw.isConfigured()) {
+  var ok =
+    aw &&
+    aw.databases &&
+    typeof aw.isConfigured === "function" &&
+    aw.isConfigured();
+  if (!ok) {
     headerDataCache = { companies: [], reports: [] };
     return headerDataCache;
   }
@@ -109,12 +125,17 @@ async function loadHeaderNotifications() {
   if (!ul) return;
 
   ul.innerHTML =
-    '<li class="header__dropdown-item--loading"><span class="header__dropdown-dot"></span><span>Yükleniyor…</span></li>';
+    '<li><span class="header__dropdown-dot"></span><span>Yükleniyor…</span></li>';
 
   const aw = getAw();
-  if (!aw || !aw.databases || !aw.isConfigured()) {
+  var cfgOk =
+    aw &&
+    aw.databases &&
+    typeof aw.isConfigured === "function" &&
+    aw.isConfigured();
+  if (!cfgOk) {
     ul.innerHTML =
-      '<li><span class="header__dropdown-dot"></span><span>Appwrite yapılandırması eksik.</span></li>';
+      '<li><span class="header__dropdown-dot"></span><span>Appwrite yapılandırması eksik veya SDK henüz yüklenmedi.</span></li>';
     if (badge) {
       badge.textContent = "0";
       badge.hidden = true;
@@ -125,87 +146,101 @@ async function loadHeaderNotifications() {
   const items = [];
 
   try {
-    const recentReports = await aw.databases.listDocuments(
-      aw.DATABASE_ID,
-      aw.COLLECTION_REPORTS,
-      [aw.Query.orderDesc("$createdAt"), aw.Query.limit(6)]
-    );
-    const docsR = aw.normalizeDocuments(recentReports.documents || []);
-    docsR.forEach(function (row) {
-      const id = row.id != null ? String(row.id) : "";
-      const title = rowValFlexible(row, ["title"]) || "Rapor";
-      const ca = row.createdAt || row.$createdAt;
-      const ts = ca ? new Date(ca).getTime() : 0;
-      const t = String(title);
-      items.push({
-        ts: ts,
-        html:
-          '<li><span class="header__dropdown-dot"></span><a class="header__dropdown-link" href="./reports.html#report-' +
-          encodeURIComponent(id) +
-          '">Yeni rapor: ' +
-          escapeHtml(t.length > 42 ? t.slice(0, 40) + "…" : t) +
-          "</a></li>",
+    try {
+      const recentReports = await aw.databases.listDocuments(
+        aw.DATABASE_ID,
+        aw.COLLECTION_REPORTS,
+        [aw.Query.orderDesc("$createdAt"), aw.Query.limit(6)]
+      );
+      const docsR = aw.normalizeDocuments(recentReports.documents || []);
+      docsR.forEach(function (row) {
+        const id = row.id != null ? String(row.id) : "";
+        const title = rowValFlexible(row, ["title"]) || "Rapor";
+        const ca = row.createdAt || row.$createdAt;
+        const ts = ca ? new Date(ca).getTime() : 0;
+        const t = String(title);
+        items.push({
+          ts: ts,
+          html:
+            '<li><span class="header__dropdown-dot"></span><a class="header__dropdown-link" href="./reports.html#report-' +
+            encodeURIComponent(id) +
+            '">Yeni rapor: ' +
+            escapeHtml(t.length > 42 ? t.slice(0, 40) + "…" : t) +
+            "</a></li>",
+        });
       });
-    });
+    } catch (e1) {
+      console.warn("[3N] Son rapor bildirimleri alınamadı:", e1);
+    }
 
-    const recentCos = await aw.databases.listDocuments(
-      aw.DATABASE_ID,
-      aw.COLLECTION_COMPANIES,
-      [aw.Query.orderDesc("$updatedAt"), aw.Query.limit(12)]
-    );
-    const docsC = aw.normalizeDocuments(recentCos.documents || []);
-    docsC.forEach(function (row) {
-      const created = row.createdAt || row.$createdAt;
-      const updated = row.updatedAt || row.$updatedAt;
-      const cMs = created ? new Date(created).getTime() : 0;
-      const uMs = updated ? new Date(updated).getTime() : 0;
-      if (!uMs || uMs <= cMs + 60000) return;
-      const id = row.id != null ? String(row.id) : "";
-      const name = rowValFlexible(row, ["name"]) || "Şirket";
-      const n = String(name);
-      items.push({
-        ts: uMs,
-        html:
-          '<li><span class="header__dropdown-dot"></span><a class="header__dropdown-link" href="./companies.html#company-' +
-          encodeURIComponent(id) +
-          '">Şirket güncellendi: ' +
-          escapeHtml(n.length > 36 ? n.slice(0, 34) + "…" : n) +
-          "</a></li>",
+    try {
+      const recentCos = await aw.databases.listDocuments(
+        aw.DATABASE_ID,
+        aw.COLLECTION_COMPANIES,
+        [aw.Query.orderDesc("$updatedAt"), aw.Query.limit(12)]
+      );
+      const docsC = aw.normalizeDocuments(recentCos.documents || []);
+      docsC.forEach(function (row) {
+        const created = row.createdAt || row.$createdAt;
+        const updated = row.updatedAt || row.$updatedAt;
+        const cMs = created ? new Date(created).getTime() : 0;
+        const uMs = updated ? new Date(updated).getTime() : 0;
+        if (!uMs || uMs <= cMs + 60000) return;
+        const id = row.id != null ? String(row.id) : "";
+        const name = rowValFlexible(row, ["name"]) || "Şirket";
+        const n = String(name);
+        items.push({
+          ts: uMs,
+          html:
+            '<li><span class="header__dropdown-dot"></span><a class="header__dropdown-link" href="./companies.html#company-' +
+            encodeURIComponent(id) +
+            '">Şirket güncellendi: ' +
+            escapeHtml(n.length > 36 ? n.slice(0, 34) + "…" : n) +
+            "</a></li>",
+        });
       });
-    });
+    } catch (e2) {
+      console.warn("[3N] Şirket güncelleme bildirimleri alınamadı:", e2);
+    }
 
-    const allReports = (await ensureHeaderDataCache()).reports || [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    allReports.forEach(function (row) {
-      const raw = rowValFlexible(row, [
-        "expiryDate",
-        "expiry_date",
-        "validUntil",
-        "valid_until",
-      ]);
-      const exp = parseExpiryForNotify(raw);
-      if (!exp) return;
-      exp.setHours(0, 0, 0, 0);
-      const diffDays = Math.round((exp.getTime() - today.getTime()) / 86400000);
-      if (diffDays < 0 || diffDays > 30) return;
-      const id = row.id != null ? String(row.id) : "";
-      const title = rowValFlexible(row, ["title"]) || "Rapor";
-      const t = String(title);
-      items.push({
-        ts: exp.getTime(),
-        html:
-          '<li><span class="header__dropdown-dot"></span><a class="header__dropdown-link" href="./reports.html#report-' +
-          encodeURIComponent(id) +
-          '">Geçerlilik ' +
-          (diffDays === 0
-            ? "bugün bitiyor"
-            : diffDays + " gün içinde bitiyor") +
-          ": " +
-          escapeHtml(t.length > 32 ? t.slice(0, 30) + "…" : t) +
-          "</a></li>",
+    try {
+      const allReports = (await ensureHeaderDataCache()).reports || [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      allReports.forEach(function (row) {
+        const raw = rowValFlexible(row, [
+          "expiryDate",
+          "expiry_date",
+          "validUntil",
+          "valid_until",
+        ]);
+        const exp = parseExpiryForNotify(raw);
+        if (!exp) return;
+        exp.setHours(0, 0, 0, 0);
+        const diffDays = Math.round(
+          (exp.getTime() - today.getTime()) / 86400000
+        );
+        if (diffDays < 0 || diffDays > 30) return;
+        const id = row.id != null ? String(row.id) : "";
+        const title = rowValFlexible(row, ["title"]) || "Rapor";
+        const t = String(title);
+        items.push({
+          ts: exp.getTime(),
+          html:
+            '<li><span class="header__dropdown-dot"></span><a class="header__dropdown-link" href="./reports.html#report-' +
+            encodeURIComponent(id) +
+            '">Geçerlilik ' +
+            (diffDays === 0
+              ? "bugün bitiyor"
+              : diffDays + " gün içinde bitiyor") +
+            ": " +
+            escapeHtml(t.length > 32 ? t.slice(0, 30) + "…" : t) +
+            "</a></li>",
+        });
       });
-    });
+    } catch (e3) {
+      console.warn("[3N] Geçerlilik bildirimleri alınamadı:", e3);
+    }
   } catch (e) {
     ul.innerHTML =
       '<li><span class="header__dropdown-dot"></span><span>Bildirimler yüklenemedi.</span></li>';
@@ -249,6 +284,9 @@ function closeHeaderSearchPanel() {
 }
 
 function wireHeaderGlobalSearch() {
+  if (window.__3nHeaderSearchWired) return;
+  window.__3nHeaderSearchWired = true;
+
   const input = document.getElementById("headerSearchInput");
   const panel = document.getElementById("headerSearchPanel");
   const slot = document.querySelector(".header-search-slot");
@@ -260,15 +298,23 @@ function wireHeaderGlobalSearch() {
     function () {
       if (t) clearTimeout(t);
       t = setTimeout(function () {
-        void renderHeaderSearchResults(input.value);
+        renderHeaderSearchResults(input.value).catch(function (err) {
+          console.warn("[3N] Üst arama:", err);
+        });
       }, 220);
     }
   );
   input.addEventListener("focus", function () {
-    if (input.value.trim()) void renderHeaderSearchResults(input.value);
+    if (input.value.trim()) {
+      renderHeaderSearchResults(input.value).catch(function () {
+        /* — */
+      });
+    }
   });
   document.addEventListener("click", function (e) {
-    if (!slot.contains(e.target)) closeHeaderSearchPanel();
+    if (slot && e.target && !slot.contains(e.target)) {
+      closeHeaderSearchPanel();
+    }
   });
   input.addEventListener("keydown", function (e) {
     if (e.key === "Escape") closeHeaderSearchPanel();
@@ -300,9 +346,14 @@ async function renderHeaderSearchResults(q) {
     const cid = rowValFlexible(r, ["companyId", "company_id"]);
     let cname = "";
     if (cid != null) {
-      const co = companies.find(function (x) {
-        return String(x.id) === String(cid);
-      });
+      var ci;
+      var co = null;
+      for (ci = 0; ci < companies.length; ci++) {
+        if (String(companies[ci].id) === String(cid)) {
+          co = companies[ci];
+          break;
+        }
+      }
       cname =
         co && rowValFlexible(co, ["name"])
           ? String(rowValFlexible(co, ["name"])).toLowerCase()
@@ -375,13 +426,6 @@ function formatReportDate(isoString) {
     month: "2-digit",
     year: "numeric",
   });
-}
-
-/** Metni güvenli şekilde HTML içine yazmak için kaçırır */
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text == null ? "" : String(text);
-  return div.innerHTML;
 }
 
 /** İstatistik kartındaki <h3> metnini günceller */
@@ -1100,41 +1144,72 @@ function wireSidebarLogout() {
 // ---------------------------------------------------------------------------
 
 function scheduleHeaderAppwriteFeatures() {
-  var n = 0;
-  function tick() {
-    const aw = getAw();
-    if (aw && aw.isConfigured && aw.isConfigured()) {
-      void ensureHeaderDataCache().then(function () {
-        void loadHeaderNotifications();
-      });
-      wireHeaderGlobalSearch();
-      return;
+  if (window.__3nHeaderChromeScheduled) return;
+  window.__3nHeaderChromeScheduled = true;
+
+  function start() {
+    wireHeaderGlobalSearch();
+    var n = 0;
+    function tick() {
+      var aw = getAw();
+      var ready =
+        aw &&
+        aw.databases &&
+        typeof aw.isConfigured === "function" &&
+        aw.isConfigured();
+      if (ready) {
+        ensureHeaderDataCache()
+          .then(function () {
+            return loadHeaderNotifications();
+          })
+          .catch(function (err) {
+            console.warn("[3N] Bildirim / önbellek:", err);
+          });
+        return;
+      }
+      n += 1;
+      if (n < 100) {
+        setTimeout(tick, 40);
+      } else {
+        loadHeaderNotifications().catch(function (err) {
+          console.warn("[3N] Bildirimler:", err);
+        });
+      }
     }
-    n += 1;
-    if (n < 80) {
-      setTimeout(tick, 50);
-    } else {
-      void loadHeaderNotifications();
-      wireHeaderGlobalSearch();
-    }
+    tick();
   }
-  tick();
+
+  if (document.readyState === "complete") {
+    setTimeout(start, 0);
+  } else {
+    window.addEventListener("load", function () {
+      setTimeout(start, 0);
+    });
+  }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-  applySessionUserToHeader();
-  setActiveSidebarNav();
-  wireSidebarLogout();
-
-  if (document.getElementById("notifyMenuBtn")) {
-    wireHeaderDropdowns();
-    scheduleHeaderAppwriteFeatures();
+  try {
+    applySessionUserToHeader();
+  } catch (e) {
+    console.warn("[3N] Oturum adı:", e);
   }
+  try {
+    setActiveSidebarNav();
+    wireSidebarLogout();
 
-  if (document.getElementById("recent-reports-list")) {
-    renderCalendar();
-    wireCalendarNav();
-    wireCalendarGridInteraction();
-    loadDashboardData();
+    if (document.getElementById("notifyMenuBtn")) {
+      wireHeaderDropdowns();
+      scheduleHeaderAppwriteFeatures();
+    }
+
+    if (document.getElementById("recent-reports-list")) {
+      renderCalendar();
+      wireCalendarNav();
+      wireCalendarGridInteraction();
+      loadDashboardData();
+    }
+  } catch (e2) {
+    console.error("[3N] Sayfa başlatma:", e2);
   }
 });
