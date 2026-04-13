@@ -24,7 +24,7 @@
   /** QR kaynak görüntüsü (küçültülünce/büyütülünce okunabilir kalsın) */
   const QR_SOURCE_SIZE = 480;
 
-  /** Appwrite Storage fileId (ID.unique, ≤36 karakter) — QR URL ve createFile bu kimliği kullanır */
+  /** Appwrite Storage fileId (newUniqueFileId() ile) — QR URL ve createFile aynı kimlik */
   let currentQrStorageId = "";
   /** İndirme / File.name için görünen PDF adı (özel karakterler sanitize edilir) */
   let currentQrDisplayFileName = "";
@@ -63,8 +63,8 @@
   function assignNewQrFileName() {
     const aw = getAw();
     currentQrStorageId =
-      aw && aw.ID && typeof aw.ID.unique === "function"
-        ? aw.ID.unique()
+      aw && typeof aw.newUniqueFileId === "function"
+        ? aw.newUniqueFileId()
         : "";
     var firma = sanitizeStorageFileLabel(getQrStudioCompanyDisplayName());
     currentQrDisplayFileName =
@@ -684,6 +684,15 @@
       );
       return;
     }
+    if (
+      aw.isValidStorageFileId &&
+      !aw.isValidStorageFileId(currentQrStorageId)
+    ) {
+      window.alert(
+        "Geçersiz depo dosya kimliği. Lütfen «Karekodu Yerleştir / Yenile» ile yeniden deneyin."
+      );
+      return;
+    }
 
     setLoading(true, "PDF oluşturuluyor ve yükleniyor…");
 
@@ -691,15 +700,21 @@
       const pdfBlob = buildPdfBlobFromFabric(fabricCanvas);
       const pdfFile = aw.blobToFile(pdfBlob, currentQrDisplayFileName);
 
-      await aw.storage.createFile(
+      const uploadResult = await aw.storage.createFile(
         aw.BUCKET_REPORTS,
         currentQrStorageId,
         pdfFile
       );
-      const publicUrl = aw.getStorageFileViewUrl(
+      console.log("Appwrite'dan Dönen Dosya Cevabı:", uploadResult);
+      const publicUrl = aw.pdfViewUrlFromUploadResult(
         aw.BUCKET_REPORTS,
-        currentQrStorageId
+        uploadResult
       );
+      if (!publicUrl) {
+        throw new Error(
+          "Yükleme yanıtında geçerli dosya kimliği ($id) yok; PDF adresi oluşturulamadı."
+        );
+      }
 
       const insertPayload = {
         title: title,
@@ -711,7 +726,7 @@
       await aw.databases.createDocument(
         aw.DATABASE_ID,
         aw.COLLECTION_REPORTS,
-        aw.ID.unique(),
+        aw.newUniqueFileId(),
         insertPayload
       );
 

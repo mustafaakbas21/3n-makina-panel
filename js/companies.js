@@ -23,6 +23,9 @@
   /** Sunucudan gelen tüm satırlar (arama istemci tarafında) */
   let companiesCache = [];
 
+  /** null = yeni kayıt; aksi halde güncellenecek belge $id */
+  let editingCompanyId = null;
+
   function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text == null ? "" : String(text);
@@ -162,6 +165,17 @@
     applyFilterAndRender();
   }
 
+  function setCompanyModalUi(isEdit) {
+    const titleEl = document.getElementById("companyModalTitle");
+    const saveBtn = document.getElementById("saveCompanyBtn");
+    if (titleEl) {
+      titleEl.textContent = isEdit ? "Şirketi Düzenle" : "Yeni Şirket Ekle";
+    }
+    if (saveBtn) {
+      saveBtn.textContent = isEdit ? "Güncelle" : "Kaydet";
+    }
+  }
+
   function openModal() {
     const root = document.getElementById("companyModal");
     if (!root) return;
@@ -178,11 +192,50 @@
     root.hidden = true;
     root.style.display = "none";
     document.body.style.overflow = "";
+    editingCompanyId = null;
+    setCompanyModalUi(false);
   }
 
   function clearForm() {
     const form = document.getElementById("companyForm");
     if (form) form.reset();
+  }
+
+  function openCreateModal() {
+    editingCompanyId = null;
+    clearForm();
+    setCompanyModalUi(false);
+    openModal();
+  }
+
+  function fillCompanyFormFromRow(row) {
+    function setInput(id, keys) {
+      const v = rowVal(row, keys);
+      const el = document.getElementById(id);
+      if (el) el.value = v != null ? String(v) : "";
+    }
+    setInput("companyName", ["name"]);
+    setInput("taxOffice", ["taxOffice", "tax_office"]);
+    setInput("taxNumber", ["taxNumber", "tax_number"]);
+    setInput("cityDistrict", ["cityDistrict", "city_district"]);
+    setInput("companyAddress", ["address"]);
+    setInput("contactName", ["contactName", "contact_name"]);
+    setInput("companyPhone", ["phone"]);
+    setInput("companyEmail", ["email"]);
+  }
+
+  function openEditModal(companyId) {
+    const row = companiesCache.find(function (c) {
+      return c && String(c.id) === String(companyId);
+    });
+    if (!row) {
+      window.alert("Şirket bulunamadı. Sayfayı yenileyip tekrar deneyin.");
+      return;
+    }
+    editingCompanyId = String(companyId);
+    fillCompanyFormFromRow(row);
+    setCompanyModalUi(true);
+    openModal();
   }
 
   async function saveCompany() {
@@ -222,16 +275,27 @@
     if (saveBtn) saveBtn.disabled = true;
 
     try {
-      await aw.databases.createDocument(
-        aw.DATABASE_ID,
-        aw.COLLECTION_COMPANIES,
-        aw.ID.unique(),
-        payload
-      );
+      if (editingCompanyId) {
+        await aw.databases.updateDocument(
+          aw.DATABASE_ID,
+          aw.COLLECTION_COMPANIES,
+          editingCompanyId,
+          payload
+        );
+      } else {
+        await aw.databases.createDocument(
+          aw.DATABASE_ID,
+          aw.COLLECTION_COMPANIES,
+          aw.newUniqueFileId(),
+          payload
+        );
+      }
     } catch (insErr) {
       if (saveBtn) saveBtn.disabled = false;
+      var prefix = editingCompanyId ? "Kayıt güncellenemedi" : "Kayıt eklenemedi";
       window.alert(
-        "Kayıt eklenemedi: " +
+        prefix +
+          ": " +
           (insErr && insErr.message ? insErr.message : String(insErr)) +
           "\n\nAppwrite’da Companies koleksiyonunda ilgili attribute’lar tanımlı mı?"
       );
@@ -245,6 +309,56 @@
     await loadCompanies();
   }
 
+  async function deleteCompany(companyId, triggerBtn) {
+    if (!companyId) return;
+    const aw = getAw();
+    if (!aw || !aw.databases || !aw.isConfigured()) {
+      window.alert(
+        "Appwrite yapılandırması eksik. js/appwrite-config.mjs dosyasını kontrol edin."
+      );
+      return;
+    }
+
+    const row = companiesCache.find(function (c) {
+      return c && String(c.id) === String(companyId);
+    });
+    const nameRaw = row ? rowVal(row, ["name"]) : null;
+    const label =
+      nameRaw != null && String(nameRaw).trim() !== ""
+        ? String(nameRaw).trim()
+        : String(companyId);
+
+    const ok = window.confirm(
+      "Bu şirketi kalıcı olarak silmek istediğinize emin misiniz?\n\n" + label
+    );
+    if (!ok) return;
+
+    if (triggerBtn) triggerBtn.disabled = true;
+    try {
+      await aw.databases.deleteDocument(
+        aw.DATABASE_ID,
+        aw.COLLECTION_COMPANIES,
+        companyId
+      );
+    } catch (err) {
+      window.alert(
+        "Şirket silinemedi: " +
+          (err && err.message ? err.message : String(err)) +
+          "\n\nAppwrite’da silme izni ve ilişkili rapor kısıtları kontrol edin."
+      );
+      return;
+    } finally {
+      if (triggerBtn) triggerBtn.disabled = false;
+    }
+
+    if (editingCompanyId && String(editingCompanyId) === String(companyId)) {
+      closeModal();
+      clearForm();
+    }
+
+    await loadCompanies();
+  }
+
   function wireTableActions() {
     const tbody = document.getElementById("companiesTableBody");
     if (!tbody) return;
@@ -252,7 +366,16 @@
       const btn = e.target.closest("[data-table-action]");
       if (!btn) return;
       e.preventDefault();
-      window.alert("Bu özellik yakında eklenecek.");
+      const action = btn.getAttribute("data-table-action");
+      const tr = btn.closest("tr[data-company-id]");
+      const cid = tr ? tr.getAttribute("data-company-id") : null;
+      if (action === "edit" && cid) {
+        openEditModal(cid);
+        return;
+      }
+      if (action === "delete" && cid) {
+        deleteCompany(cid, btn);
+      }
     });
   }
 
@@ -265,8 +388,7 @@
     const addBtn = document.getElementById("addCompanyBtn");
     if (addBtn) {
       addBtn.addEventListener("click", function () {
-        clearForm();
-        openModal();
+        openCreateModal();
       });
     }
 

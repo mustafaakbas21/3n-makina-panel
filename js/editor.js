@@ -27,7 +27,7 @@ const REPORT_DB_COLUMNS = {
 };
 
 /**
- * Appwrite Storage fileId (ID.unique) — QR ve getFileView URL’si bu kimlikle uyumludur.
+ * Appwrite Storage fileId (newUniqueFileId) — QR ve görüntüleme URL’si bu kimlikle uyumludur.
  */
 let currentReportStorageId = "";
 /**
@@ -61,8 +61,8 @@ function getEditorCompanyDisplayName() {
 function assignNewReportFileName() {
   const aw = getAw();
   currentReportStorageId =
-    aw && aw.ID && typeof aw.ID.unique === "function"
-      ? aw.ID.unique()
+    aw && typeof aw.newUniqueFileId === "function"
+      ? aw.newUniqueFileId()
       : "";
   var firma = sanitizeReportStorageFileLabel(getEditorCompanyDisplayName());
   currentReportFileName =
@@ -1401,16 +1401,32 @@ async function saveReportAndUpload() {
       );
       return;
     }
+    if (
+      aw.isValidStorageFileId &&
+      !aw.isValidStorageFileId(currentReportStorageId)
+    ) {
+      window.alert(
+        "Geçersiz depo dosya kimliği. Sayfayı yenileyip tekrar deneyin."
+      );
+      return;
+    }
     const pdfFile = aw.blobToFile(pdfBlob, currentReportFileName);
-    await aw.storage.createFile(
+    const uploadResult = await aw.storage.createFile(
       aw.BUCKET_REPORT_PDFS,
       currentReportStorageId,
       pdfFile
     );
-    const publicUrl = aw.getStorageFileViewUrl(
+    console.log("Appwrite'dan Dönen Dosya Cevabı:", uploadResult);
+    const publicUrl = aw.pdfViewUrlFromUploadResult(
       aw.BUCKET_REPORT_PDFS,
-      currentReportStorageId
+      uploadResult
     );
+    if (!publicUrl) {
+      window.alert(
+        "PDF yüklendi ancak görüntüleme adresi oluşturulamadı (yanıtta geçerli $id yok)."
+      );
+      return;
+    }
 
     // 4) Veritabanı belgesi (attribute adları REPORT_DB_COLUMNS ile)
     const insertRow = {};
@@ -1423,7 +1439,7 @@ async function saveReportAndUpload() {
       await aw.databases.createDocument(
         aw.DATABASE_ID,
         aw.COLLECTION_REPORTS,
-        aw.ID.unique(),
+        aw.newUniqueFileId(),
         insertRow
       );
     } catch (insertError) {

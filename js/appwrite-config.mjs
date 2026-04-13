@@ -4,6 +4,7 @@
  * CDN script’i (window.Appwrite) bu dosyadan önce yüklenmelidir.
  * Koleksiyon / bucket ID’lerini Appwrite konsolundan alıp burada güncelleyin.
  */
+/** CDN: <script src=".../appwrite.../sdk.js"> → window.Appwrite */
 const AppwriteGlobal =
   (typeof globalThis !== "undefined" && globalThis.Appwrite) ||
   (typeof window !== "undefined" && window.Appwrite) ||
@@ -16,6 +17,11 @@ if (!AppwriteGlobal || !AppwriteGlobal.Client) {
 }
 
 const { Client, Account, Databases, Storage, ID, Query } = AppwriteGlobal;
+
+/** Tırnak içi "unique()" değil — her zaman fonksiyon çağrısı: ID.unique() */
+function newUniqueFileId() {
+  return ID.unique();
+}
 
 const client = new Client()
   .setEndpoint("https://fra.cloud.appwrite.io/v1")
@@ -51,40 +57,58 @@ function normalizeDocuments(docs) {
   return (docs || []).map(normalizeDocument);
 }
 
-function getStorageFileViewUrl(bucketId, fileId) {
-  try {
-    var u = storage.getFileView(bucketId, fileId);
-    if (typeof u === "string") return u;
-    if (u && typeof u.href === "string") return u.href;
-    return String(u);
-  } catch (e) {
-    return "";
-  }
+/** Appwrite Storage fileId: en fazla 36 karakter; a-z, A-Z, 0-9, _ ; başta _ olamaz. (literal "unique()" geçersizdir) */
+function isValidStorageFileId(id) {
+  if (id == null || typeof id !== "string") return false;
+  var s = id.trim();
+  if (s.length < 1 || s.length > 36) return false;
+  if (s.charAt(0) === "_") return false;
+  return /^[a-zA-Z0-9_]+$/.test(s);
 }
 
 /**
- * storage.createFile() yanıtındaki gerçek dosya kimliği ($id). Yanıtta yoksa yüklemede kullanılan fileId (fallback).
- * URL’de asla "unique()" gibi sabit metin kullanılmamalı — her zaman bu dönen kimlik.
+ * İstemci ile aynı endpoint/project; örnek:
+ * {endpoint}/storage/buckets/{bucketId}/files/{fileId}/view?project={projectId}
  */
-function storageFileIdFromUploadResult(uploadResult, fallbackFileId) {
-  if (uploadResult && typeof uploadResult === "object") {
-    if (uploadResult.$id != null && String(uploadResult.$id).trim() !== "") {
-      return String(uploadResult.$id);
-    }
-    if (uploadResult.id != null && String(uploadResult.id).trim() !== "") {
-      return String(uploadResult.id);
-    }
+function buildStorageFileViewUrl(bucketId, fileId) {
+  if (!isValidStorageFileId(fileId)) {
+    return "";
   }
-  if (fallbackFileId != null && String(fallbackFileId).trim() !== "") {
-    return String(fallbackFileId);
-  }
-  return "";
+  var ep = String(client.config.endpoint || "").replace(/\/$/, "");
+  var pid = String(client.config.project || "");
+  var b = encodeURIComponent(String(bucketId));
+  var f = encodeURIComponent(String(fileId));
+  return (
+    ep +
+    "/storage/buckets/" +
+    b +
+    "/files/" +
+    f +
+    "/view?project=" +
+    encodeURIComponent(pid)
+  );
 }
 
-function getStorageFileViewUrlAfterUpload(bucketId, uploadResult, fallbackFileId) {
-  var fid = storageFileIdFromUploadResult(uploadResult, fallbackFileId);
-  if (!fid) return "";
-  return getStorageFileViewUrl(bucketId, fid);
+function getStorageFileViewUrl(bucketId, fileId) {
+  return buildStorageFileViewUrl(bucketId, fileId);
+}
+
+/**
+ * Yalnızca createFile yanıtındaki gerçek $id ile URL (fallback yok — yanlışlıkla "unique()" yazılmasını engeller).
+ */
+function pdfViewUrlFromUploadResult(bucketId, uploadResult) {
+  if (!uploadResult || typeof uploadResult !== "object") {
+    return "";
+  }
+  var fid =
+    uploadResult.$id != null ? String(uploadResult.$id).trim() : "";
+  if (!fid && uploadResult.id != null) {
+    fid = String(uploadResult.id).trim();
+  }
+  if (!isValidStorageFileId(fid)) {
+    return "";
+  }
+  return buildStorageFileViewUrl(bucketId, fid);
 }
 
 function blobToFile(blob, filename) {
@@ -110,6 +134,10 @@ window.__3nAppwrite = {
   storage: storage,
   ID: ID,
   Query: Query,
+  newUniqueFileId: newUniqueFileId,
+  isValidStorageFileId: isValidStorageFileId,
+  buildStorageFileViewUrl: buildStorageFileViewUrl,
+  pdfViewUrlFromUploadResult: pdfViewUrlFromUploadResult,
   DATABASE_ID: DATABASE_ID,
   COLLECTION_COMPANIES: COLLECTION_COMPANIES,
   COLLECTION_REPORTS: COLLECTION_REPORTS,
@@ -121,7 +149,5 @@ window.__3nAppwrite = {
   normalizeDocument: normalizeDocument,
   normalizeDocuments: normalizeDocuments,
   getStorageFileViewUrl: getStorageFileViewUrl,
-  getStorageFileViewUrlAfterUpload: getStorageFileViewUrlAfterUpload,
-  storageFileIdFromUploadResult: storageFileIdFromUploadResult,
   blobToFile: blobToFile,
 };

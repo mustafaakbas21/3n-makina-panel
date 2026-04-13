@@ -426,7 +426,7 @@
       "_" +
       Date.now() +
       ".pdf";
-    var storageFileId = aw.ID.unique();
+    var storageFileId = aw.newUniqueFileId();
     var uploadFile = new File(
       [await file.arrayBuffer()],
       displayFileName,
@@ -437,8 +437,23 @@
 
     var publicUrl = "";
     try {
-      await aw.storage.createFile(aw.BUCKET_REPORTS, storageFileId, uploadFile);
-      publicUrl = aw.getStorageFileViewUrl(aw.BUCKET_REPORTS, storageFileId);
+      const uploadResult = await aw.storage.createFile(
+        aw.BUCKET_REPORTS,
+        storageFileId,
+        uploadFile
+      );
+      console.log("Appwrite'dan Dönen Dosya Cevabı:", uploadResult);
+      publicUrl = aw.pdfViewUrlFromUploadResult(
+        aw.BUCKET_REPORTS,
+        uploadResult
+      );
+      if (!publicUrl) {
+        window.alert(
+          "Dosya yüklendi ancak görüntüleme adresi oluşturulamadı (yanıtta geçerli $id yok)."
+        );
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+      }
     } catch (uploadError) {
       window.alert(
         "Dosya yüklenemedi:\n" +
@@ -461,7 +476,7 @@
       await aw.databases.createDocument(
         aw.DATABASE_ID,
         aw.COLLECTION_REPORTS,
-        aw.ID.unique(),
+        aw.newUniqueFileId(),
         insertRow
       );
     } catch (insErr) {
