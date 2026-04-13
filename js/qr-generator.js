@@ -67,6 +67,7 @@
     }
     qrFabricImage = null;
     lastQrDataUrl = "";
+    setRepoSavePanelVisible(false);
   }
 
   function buildPdfBlobFromFabric(fc) {
@@ -86,10 +87,70 @@
     return pdf.output("blob");
   }
 
-  function defaultExpiryISO() {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() + 1);
-    return d.toISOString().slice(0, 10);
+  function localDateISOForInput(d) {
+    return (
+      d.getFullYear() +
+      "-" +
+      String(d.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(d.getDate()).padStart(2, "0")
+    );
+  }
+
+  /** create-report / editor ile aynı varsayılan tarihler */
+  function fillDefaultQrReportDates() {
+    const f = document.getElementById("qrFirstDate");
+    const r = document.getElementById("qrReminderDate");
+    const ex = document.getElementById("qrExpiryDate");
+    if (!f || !r) return;
+    if (!f.value) {
+      f.value = localDateISOForInput(new Date());
+    }
+    if (!r.value) {
+      const n = new Date();
+      n.setFullYear(n.getFullYear() + 1);
+      r.value = localDateISOForInput(n);
+    }
+    if (ex && !ex.value) {
+      const n = new Date();
+      n.setFullYear(n.getFullYear() + 1);
+      ex.value = localDateISOForInput(n);
+    }
+  }
+
+  function getQrCalendarDateValues() {
+    const f = document.getElementById("qrFirstDate");
+    const r = document.getElementById("qrReminderDate");
+    let firstD = f && f.value ? f.value.trim() : "";
+    let remD = r && r.value ? r.value.trim() : "";
+    if (!firstD) firstD = localDateISOForInput(new Date());
+    if (!remD) {
+      const n = new Date();
+      n.setFullYear(n.getFullYear() + 1);
+      remD = localDateISOForInput(n);
+    }
+    return { firstDate: firstD, reminderDate: remD };
+  }
+
+  function dataUrlToBlob(dataUrl) {
+    const arr = dataUrl.split(",");
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) u8arr[n] = bstr.charCodeAt(n);
+    return new Blob([u8arr], { type: mime });
+  }
+
+  function setRepoSavePanelVisible(visible) {
+    const panel = document.getElementById("qrRepoSavePanel");
+    const ok = document.getElementById("qrSaveSuccess");
+    if (panel) panel.hidden = !visible;
+    if (!visible && ok) {
+      ok.hidden = true;
+      const t = document.getElementById("qrSaveSuccessText");
+      if (t) t.textContent = "";
+    }
   }
 
   /**
@@ -434,6 +495,101 @@
         { crossOrigin: "anonymous" }
       );
     });
+
+    setRepoSavePanelVisible(true);
+    const ok = document.getElementById("qrSaveSuccess");
+    if (ok) ok.hidden = true;
+  }
+
+  async function saveQrToRepository() {
+    if (!lastQrDataUrl) {
+      window.alert("Önce karekodu tuval üzerine ekleyin.");
+      return;
+    }
+
+    const companySel = document.getElementById("qrStudioCompany");
+    const companyId = companySel && companySel.value ? companySel.value.trim() : "";
+    if (!companyId) {
+      window.alert("Kayıt için lütfen şirket seçin.");
+      if (companySel) companySel.focus();
+      return;
+    }
+
+    const titleEl = document.getElementById("qrReportTitle");
+    const reportTitle =
+      titleEl && titleEl.value && titleEl.value.trim()
+        ? titleEl.value.trim()
+        : "QR Stüdyosu kaydı";
+
+    const expiryEl = document.getElementById("qrExpiryDate");
+    const expiryVal = expiryEl && expiryEl.value ? expiryEl.value.trim() : "";
+    if (!expiryVal) {
+      window.alert("Lütfen geçerlilik bitiş tarihini seçin.");
+      if (expiryEl) expiryEl.focus();
+      return;
+    }
+
+    const aw = getAw();
+    if (!aw || !aw.storage || !aw.databases || !aw.isConfigured()) {
+      window.alert("Appwrite yapılandırması eksik. js/appwrite-config.mjs dosyasını kontrol edin.");
+      return;
+    }
+
+    const btn = document.getElementById("qrSaveToRepoBtn");
+    const origHtml = btn ? btn.innerHTML : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML =
+        '<span class="qr-repo-save__spinner" aria-hidden="true"></span> Kaydediliyor…';
+    }
+
+    try {
+      const blob = dataUrlToBlob(lastQrDataUrl);
+      const fileId = aw.ID.unique();
+      const bucketId = aw.STORAGE_BUCKET_ID || aw.BUCKET_REPORTS;
+      const file = aw.blobToFile(blob, "qr_" + fileId + ".png");
+
+      await aw.storage.createFile(bucketId, fileId, file);
+      const publicUrl = aw.getStorageFileViewUrl(bucketId, fileId);
+
+      const insertPayload = {
+        title: reportTitle,
+        companyId: companyId,
+        pdfUrl: publicUrl,
+        expiryDate: expiryVal,
+      };
+
+      await aw.databases.createDocument(
+        aw.DATABASE_ID,
+        aw.COLLECTION_REPORTS,
+        aw.ID.unique(),
+        insertPayload
+      );
+
+      const calDates = getQrCalendarDateValues();
+      if (typeof window.__3nSaveReportCalendarMarkers === "function") {
+        window.__3nSaveReportCalendarMarkers({
+          firstDate: calDates.firstDate,
+          reminderDate: calDates.reminderDate,
+          title: reportTitle,
+        });
+      }
+
+      const okBox = document.getElementById("qrSaveSuccess");
+      const okText = document.getElementById("qrSaveSuccessText");
+      if (okText) {
+        okText.textContent =
+          "Karekod görseli kaydedildi ve rapor listesine eklendi.";
+      }
+      if (okBox) okBox.hidden = false;
+    } catch (e) {
+      window.alert(e && e.message ? e.message : String(e));
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
+    }
   }
 
   async function completeWorkflow() {
@@ -459,6 +615,14 @@
       titleEl && titleEl.value && titleEl.value.trim()
         ? titleEl.value.trim()
         : "QR Stüdyosu çıktısı";
+
+    const expiryEl = document.getElementById("qrExpiryDate");
+    const expiryVal = expiryEl && expiryEl.value ? expiryEl.value.trim() : "";
+    if (!expiryVal) {
+      window.alert("Lütfen geçerlilik bitiş tarihini seçin.");
+      if (expiryEl) expiryEl.focus();
+      return;
+    }
 
     const aw = getAw();
     if (!aw || !aw.storage || !aw.databases || !aw.isConfigured()) {
@@ -490,7 +654,7 @@
         title: title,
         companyId: companyId,
         pdfUrl: publicUrl,
-        expiryDate: defaultExpiryISO(),
+        expiryDate: expiryVal,
       };
 
       await aw.databases.createDocument(
@@ -499,6 +663,15 @@
         aw.ID.unique(),
         insertPayload
       );
+
+      const calDates = getQrCalendarDateValues();
+      if (typeof window.__3nSaveReportCalendarMarkers === "function") {
+        window.__3nSaveReportCalendarMarkers({
+          firstDate: calDates.firstDate,
+          reminderDate: calDates.reminderDate,
+          title: title,
+        });
+      }
 
       setLoading(false);
       window.alert(
@@ -595,13 +768,16 @@
 
   function init() {
     assignNewQrFileName();
+    fillDefaultQrReportDates();
 
     wireDropZone();
 
     const addBtn = document.getElementById("qrAddBtn");
     const completeBtn = document.getElementById("qrCompleteBtn");
+    const saveRepoBtn = document.getElementById("qrSaveToRepoBtn");
     if (addBtn) addBtn.addEventListener("click", addQrToCanvas);
     if (completeBtn) completeBtn.addEventListener("click", completeWorkflow);
+    if (saveRepoBtn) saveRepoBtn.addEventListener("click", saveQrToRepository);
 
     loadCompanies().catch(function (e) {
       window.alert(

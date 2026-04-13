@@ -9,6 +9,105 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="./css/style.css" />
+  <style>
+    /* create-report.html ile aynı takvim alanı görünümü (QR Stüdyosu) */
+    .qr-report-dates {
+      background: #fff;
+      border: 1px solid #e8ecf4;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+    }
+    .qr-report-dates .report-topbar__row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 1rem 1.5rem;
+    }
+    .qr-report-dates .report-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      min-width: 200px;
+    }
+    .qr-report-dates .report-field label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .qr-report-dates .report-field input {
+      font: inherit;
+      padding: 0.55rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #0f172a;
+      min-width: 220px;
+    }
+    .qr-report-dates .report-field input:focus {
+      outline: none;
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+      background: #fff;
+    }
+    .qr-repo-save {
+      margin-top: 1.25rem;
+      padding: 1.25rem;
+      border-radius: 12px;
+      border: 2px dashed #c7d2fe;
+      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+      text-align: center;
+    }
+    .qr-repo-save[hidden] {
+      display: none !important;
+    }
+    .qr-repo-save__btn {
+      font-size: 1.05rem;
+      padding: 0.85rem 1.5rem;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.25);
+    }
+    .qr-repo-save__btn:disabled {
+      opacity: 0.85;
+      cursor: not-allowed;
+    }
+    .qr-repo-save__success {
+      margin-top: 1rem;
+      padding: 1rem 1.25rem;
+      border-radius: 10px;
+      background: #ecfdf5;
+      border: 1px solid #6ee7b7;
+      color: #065f46;
+      font-weight: 500;
+      text-align: left;
+    }
+    .qr-repo-save__success[hidden] {
+      display: none !important;
+    }
+    .qr-repo-save__success a {
+      color: #047857;
+      font-weight: 600;
+      text-decoration: underline;
+    }
+    .qr-repo-save__spinner {
+      display: inline-block;
+      width: 1em;
+      height: 1em;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: qr-repo-spin 0.7s linear infinite;
+      vertical-align: -0.15em;
+      margin-right: 0.4em;
+    }
+    @keyframes qr-repo-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
   <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0/dist/iife/sdk.js"></script>
   <script>
     console.log("Appwrite SDK yüklendi");
@@ -117,6 +216,23 @@
               </div>
             </div>
 
+            <div class="qr-report-dates" aria-label="Rapor tarihleri">
+              <div class="report-topbar__row">
+                <div class="report-field">
+                  <label for="qrFirstDate">İlk rapor tarihi</label>
+                  <input type="date" id="qrFirstDate" name="qrFirstDate" />
+                </div>
+                <div class="report-field">
+                  <label for="qrReminderDate">Son hatırlatıcı tarihi</label>
+                  <input type="date" id="qrReminderDate" name="qrReminderDate" />
+                </div>
+                <div class="report-field">
+                  <label for="qrExpiryDate">Geçerlilik bitiş tarihi</label>
+                  <input type="date" id="qrExpiryDate" name="qrExpiryDate" title="Geçerlilik Bitiş Tarihi" />
+                </div>
+              </div>
+            </div>
+
             <div
               id="qrDropZone"
               class="qr-studio-drop"
@@ -164,6 +280,21 @@
               <button type="button" id="qrCompleteBtn" class="btn btn--primary qr-studio-btn qr-studio-btn--primary">
                 <i class="fa-solid fa-circle-check" aria-hidden="true"></i> İşlemi Tamamla
               </button>
+            </div>
+
+            <div id="qrRepoSavePanel" class="qr-repo-save" hidden>
+              <button type="button" id="qrSaveToRepoBtn" class="btn btn--primary qr-repo-save__btn">
+                <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Rapor Deposuna Kaydet
+              </button>
+              <p class="qr-studio__lead" style="margin-top: 0.75rem; margin-bottom: 0; font-size: 0.88rem;">
+                Karekod görseli depoya yüklenir ve aşağıdaki tarih / şirket bilgileriyle rapor listesine eklenir.
+              </p>
+              <div id="qrSaveSuccess" class="qr-repo-save__success" hidden role="status">
+                <span id="qrSaveSuccessText"></span>
+                <div style="margin-top: 0.65rem;">
+                  <a href="./reports.html" id="qrSaveSuccessLink">Rapor Deposu’na git</a>
+                </div>
+              </div>
             </div>
           </section>
         </div>

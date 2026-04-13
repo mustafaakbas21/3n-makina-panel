@@ -29,7 +29,9 @@ const DATABASE_ID = "69dcdeff0008deb14b78";
 /** scripts/setup-appwrite.cjs ile oluşturulan koleksiyon / bucket ID'leri */
 const COLLECTION_COMPANIES = "companies";
 const COLLECTION_REPORTS = "reports";
-const BUCKET_ID = "3n-files";
+/** Appwrite Storage bucket ($id) — konsolda oluşturulan depo */
+const STORAGE_BUCKET_ID = "69dd6d03000313133460";
+const BUCKET_ID = STORAGE_BUCKET_ID;
 
 /** Editör PDF’leri — aynı bucket kullanılabilir */
 const BUCKET_REPORT_PDFS = BUCKET_ID;
@@ -86,6 +88,7 @@ window.__3nAppwrite = {
   DATABASE_ID: DATABASE_ID,
   COLLECTION_COMPANIES: COLLECTION_COMPANIES,
   COLLECTION_REPORTS: COLLECTION_REPORTS,
+  STORAGE_BUCKET_ID: STORAGE_BUCKET_ID,
   BUCKET_ID: BUCKET_ID,
   BUCKET_REPORT_PDFS: BUCKET_REPORT_PDFS,
   BUCKET_REPORTS: BUCKET_REPORTS,
@@ -95,12 +98,3 @@ window.__3nAppwrite = {
   getStorageFileViewUrl: getStorageFileViewUrl,
   blobToFile: blobToFile,
 };
-
-void client.ping().then(
-  function () {
-    console.info("[Appwrite] ping OK — backend erişilebilir.");
-  },
-  function (err) {
-    console.warn("[Appwrite] ping başarısız:", err);
-  }
-);
