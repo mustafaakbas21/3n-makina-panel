@@ -83,6 +83,33 @@
     return { bucketId: m[1], fileId: m[2] };
   }
 
+  /** Veritabanındaki eski hatalı kayıtlar (ör. .../files/unique()/view) — tıklanınca 400 verir */
+  function isBrokenOrInvalidPdfUrl(url) {
+    if (!url || typeof url !== "string") return true;
+    var s = url.trim();
+    if (
+      s.indexOf("/files/unique()/") !== -1 ||
+      s.indexOf("/files/unique%28%29/") !== -1
+    ) {
+      return true;
+    }
+    var m = s.match(/\/storage\/buckets\/[^/]+\/files\/([^/?#]+)/i);
+    if (!m) return false;
+    var fid;
+    try {
+      fid = decodeURIComponent(m[1]);
+    } catch (e) {
+      fid = m[1];
+    }
+    var aw = getAw();
+    if (aw && typeof aw.isValidStorageFileId === "function") {
+      return !aw.isValidStorageFileId(fid);
+    }
+    if (fid.length < 1 || fid.length > 36 || fid.charAt(0) === "_")
+      return true;
+    return !/^[a-zA-Z0-9_]+$/.test(fid);
+  }
+
   function sanitizeStorageFileLabel(raw) {
     var s = String(raw || "Belge")
       .normalize("NFD")
@@ -193,9 +220,16 @@
         const company = companyNameForReport(row);
         const fileType = fileTypeLabel(pdfUrl);
 
-        const downloadDisabled = !pdfUrl || String(pdfUrl).trim() === "";
+        const downloadDisabled =
+          !pdfUrl ||
+          String(pdfUrl).trim() === "" ||
+          isBrokenOrInvalidPdfUrl(String(pdfUrl));
         const downloadName = friendlyDownloadFilenameForRow(row);
         const downloadNameAttr = escapeHtml(downloadName);
+        const brokenTitle =
+          pdfUrl && isBrokenOrInvalidPdfUrl(String(pdfUrl))
+            ? " title=\"PDF bağlantısı geçersiz (eski hatalı kayıt). Raporu silip dosyayı yeniden yükleyin.\""
+            : "";
 
         return (
           "<tr data-report-id=\"" +
@@ -218,7 +252,9 @@
           "</td>" +
           "<td class=\"data-table__actions\">" +
           (downloadDisabled
-            ? "<span class=\"download-btn download-btn--disabled\" aria-disabled=\"true\">" +
+            ? "<span class=\"download-btn download-btn--disabled\" aria-disabled=\"true\"" +
+              brokenTitle +
+              ">" +
               "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
               "</span>"
             : "<a class=\"download-btn\" href=\"" +

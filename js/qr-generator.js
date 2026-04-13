@@ -700,6 +700,10 @@
       const pdfBlob = buildPdfBlobFromFabric(fabricCanvas);
       const pdfFile = aw.blobToFile(pdfBlob, currentQrDisplayFileName);
 
+      console.log(
+        "[3N] storage.createFile fileId (fonksiyon çıktısı olmalı):",
+        currentQrStorageId
+      );
       const uploadResult = await aw.storage.createFile(
         aw.BUCKET_REPORTS,
         currentQrStorageId,

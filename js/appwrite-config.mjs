@@ -18,9 +18,39 @@ if (!AppwriteGlobal || !AppwriteGlobal.Client) {
 
 const { Client, Account, Databases, Storage, ID, Query } = AppwriteGlobal;
 
-/** Tırnak içi "unique()" değil — her zaman fonksiyon çağrısı: ID.unique() */
+/** Appwrite Storage fileId: en fazla 36 karakter; a-z, A-Z, 0-9, _ ; başta _ olamaz. */
+function isValidStorageFileId(id) {
+  if (id == null || typeof id !== "string") return false;
+  var s = id.trim();
+  if (s.length < 1 || s.length > 36) return false;
+  if (s.charAt(0) === "_") return false;
+  return /^[a-zA-Z0-9_]+$/.test(s);
+}
+
+/**
+ * CDN: window.Appwrite.ID.unique() — asla string "unique()" değil.
+ * Kimlik üretilemezse boş döner (çağıran kod kontrol eder).
+ */
 function newUniqueFileId() {
-  return ID.unique();
+  var IdClass =
+    (typeof window !== "undefined" && window.Appwrite && window.Appwrite.ID) ||
+    ID;
+  if (!IdClass || typeof IdClass.unique !== "function") {
+    console.error("[3N] window.Appwrite.ID.unique kullanılamıyor (CDN sırası?).");
+    return "";
+  }
+  var uid = IdClass.unique();
+  uid = uid != null ? String(uid).trim() : "";
+  if (!isValidStorageFileId(uid)) {
+    console.error("[3N] ID.unique() geçersiz değer döndü:", uid);
+    uid = IdClass.unique();
+    uid = uid != null ? String(uid).trim() : "";
+  }
+  if (!isValidStorageFileId(uid)) {
+    console.error("[3N] ID.unique() ikinci denemede de geçersiz:", uid);
+    return "";
+  }
+  return uid;
 }
 
 const client = new Client()
@@ -57,15 +87,6 @@ function normalizeDocuments(docs) {
   return (docs || []).map(normalizeDocument);
 }
 
-/** Appwrite Storage fileId: en fazla 36 karakter; a-z, A-Z, 0-9, _ ; başta _ olamaz. (literal "unique()" geçersizdir) */
-function isValidStorageFileId(id) {
-  if (id == null || typeof id !== "string") return false;
-  var s = id.trim();
-  if (s.length < 1 || s.length > 36) return false;
-  if (s.charAt(0) === "_") return false;
-  return /^[a-zA-Z0-9_]+$/.test(s);
-}
-
 /**
  * İstemci ile aynı endpoint/project; örnek:
  * {endpoint}/storage/buckets/{bucketId}/files/{fileId}/view?project={projectId}
@@ -93,21 +114,30 @@ function getStorageFileViewUrl(bucketId, fileId) {
   return buildStorageFileViewUrl(bucketId, fileId);
 }
 
-/**
- * Yalnızca createFile yanıtındaki gerçek $id ile URL (fallback yok — yanlışlıkla "unique()" yazılmasını engeller).
- */
-function pdfViewUrlFromUploadResult(bucketId, uploadResult) {
+function extractFileIdFromStorageUploadResponse(uploadResult) {
   if (!uploadResult || typeof uploadResult !== "object") {
     return "";
   }
-  var fid =
-    uploadResult.$id != null ? String(uploadResult.$id).trim() : "";
-  if (!fid && uploadResult.id != null) {
-    fid = String(uploadResult.id).trim();
+  var keys = ["$id", "id", "fileId", "file_id"];
+  var i;
+  var fid;
+  for (i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (uploadResult[k] != null) {
+      fid = String(uploadResult[k]).trim();
+      if (isValidStorageFileId(fid)) return fid;
+    }
   }
-  if (!isValidStorageFileId(fid)) {
-    return "";
-  }
+  console.warn("[3N] storage yanıtında geçerli dosya $id bulunamadı:", uploadResult);
+  return "";
+}
+
+/**
+ * Yalnızca createFile yanıtındaki gerçek dosya kimliği ile URL (yanıtta $id zorunlu).
+ */
+function pdfViewUrlFromUploadResult(bucketId, uploadResult) {
+  var fid = extractFileIdFromStorageUploadResponse(uploadResult);
+  if (!fid) return "";
   return buildStorageFileViewUrl(bucketId, fid);
 }
 
@@ -138,6 +168,7 @@ window.__3nAppwrite = {
   isValidStorageFileId: isValidStorageFileId,
   buildStorageFileViewUrl: buildStorageFileViewUrl,
   pdfViewUrlFromUploadResult: pdfViewUrlFromUploadResult,
+  extractFileIdFromStorageUploadResponse: extractFileIdFromStorageUploadResponse,
   DATABASE_ID: DATABASE_ID,
   COLLECTION_COMPANIES: COLLECTION_COMPANIES,
   COLLECTION_REPORTS: COLLECTION_REPORTS,
