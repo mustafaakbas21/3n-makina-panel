@@ -62,6 +62,31 @@ function getStorageFileViewUrl(bucketId, fileId) {
   }
 }
 
+/**
+ * storage.createFile() yanıtındaki gerçek dosya kimliği ($id). Yanıtta yoksa yüklemede kullanılan fileId (fallback).
+ * URL’de asla "unique()" gibi sabit metin kullanılmamalı — her zaman bu dönen kimlik.
+ */
+function storageFileIdFromUploadResult(uploadResult, fallbackFileId) {
+  if (uploadResult && typeof uploadResult === "object") {
+    if (uploadResult.$id != null && String(uploadResult.$id).trim() !== "") {
+      return String(uploadResult.$id);
+    }
+    if (uploadResult.id != null && String(uploadResult.id).trim() !== "") {
+      return String(uploadResult.id);
+    }
+  }
+  if (fallbackFileId != null && String(fallbackFileId).trim() !== "") {
+    return String(fallbackFileId);
+  }
+  return "";
+}
+
+function getStorageFileViewUrlAfterUpload(bucketId, uploadResult, fallbackFileId) {
+  var fid = storageFileIdFromUploadResult(uploadResult, fallbackFileId);
+  if (!fid) return "";
+  return getStorageFileViewUrl(bucketId, fid);
+}
+
 function blobToFile(blob, filename) {
   return new File([blob], filename, {
     type: (blob && blob.type) || "application/octet-stream",
@@ -96,5 +121,7 @@ window.__3nAppwrite = {
   normalizeDocument: normalizeDocument,
   normalizeDocuments: normalizeDocuments,
   getStorageFileViewUrl: getStorageFileViewUrl,
+  getStorageFileViewUrlAfterUpload: getStorageFileViewUrlAfterUpload,
+  storageFileIdFromUploadResult: storageFileIdFromUploadResult,
   blobToFile: blobToFile,
 };
