@@ -386,6 +386,112 @@ a.sidebar__logout {
   background: var(--bg-page);
 }
 
+.header__dropdown-link {
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.header__dropdown-link:hover {
+  color: var(--accent);
+}
+
+.header-search-slot {
+  position: relative;
+}
+
+.header-search-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 220;
+  max-height: min(320px, 52vh);
+  overflow: auto;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--sidebar-border);
+  box-shadow: var(--shadow-card);
+}
+
+.header-search-panel[hidden] {
+  display: none !important;
+}
+
+.header-search-panel__empty {
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.header-search-panel__list {
+  margin: 0;
+  padding: 0.35rem 0;
+  list-style: none;
+}
+
+.header-search-panel__link {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.55rem 0.85rem;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.88rem;
+  transition: background 0.12s ease;
+}
+
+.header-search-panel__link:hover {
+  background: var(--bg-page);
+}
+
+.header-search-panel__link i {
+  margin-top: 0.15rem;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.header-search-panel__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.header-search-panel__title {
+  font-weight: 600;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.header-search-panel__meta {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.data-table__row--flash {
+  outline: 2px solid rgba(37, 99, 235, 0.65);
+  outline-offset: -2px;
+  animation: row-flash-fade 2.4s ease forwards;
+}
+
+@keyframes row-flash-fade {
+  0% {
+    background: rgba(59, 130, 246, 0.18);
+  }
+  40% {
+    background: rgba(59, 130, 246, 0.12);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
 .header__dropdown-dot {
   width: 8px;
   height: 8px;

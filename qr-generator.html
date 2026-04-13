@@ -8,8 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <link rel="stylesheet" href="css/style.css" />
-  <script src="js/auth-check.js"></script>
+  <link rel="stylesheet" href="./css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
+  <script>
+    console.log("Appwrite SDK yüklendi");
+  </script>
+  <script src="./js/auth-check.js"></script>
 </head>
 <body>
   <div class="app">
@@ -22,23 +26,23 @@
       </div>
 
       <nav class="sidebar__nav">
-        <a href="index.html" class="sidebar__link" data-nav="home">
+        <a href="./index.html" class="sidebar__link" data-nav="home">
           <i class="fa-solid fa-house" aria-hidden="true"></i>
           <span>Ana Sayfa</span>
         </a>
-        <a href="companies.html" class="sidebar__link" data-nav="companies">
+        <a href="./companies.html" class="sidebar__link" data-nav="companies">
           <i class="fa-solid fa-building" aria-hidden="true"></i>
           <span>Şirketler</span>
         </a>
-        <a href="reports.html" class="sidebar__link" data-nav="reports">
+        <a href="./reports.html" class="sidebar__link" data-nav="reports">
           <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
           <span>Rapor Deposu</span>
         </a>
-        <a href="create-report.html" class="sidebar__link" data-nav="create">
+        <a href="./create-report.html" class="sidebar__link" data-nav="create">
           <i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i>
           <span>Rapor Oluştur</span>
         </a>
-        <a href="qr-generator.html" class="sidebar__link sidebar__link--active" data-nav="qr">
+        <a href="./qr-generator.html" class="sidebar__link sidebar__link--active" data-nav="qr">
           <i class="fa-solid fa-qrcode" aria-hidden="true"></i>
           <span>QR Stüdyosu</span>
         </a>
@@ -56,21 +60,22 @@
       <header class="header">
         <h1 class="header__welcome">QR Kod <span class="header__name">Stüdyosu</span></h1>
         <div class="header__tools">
-          <label class="search" for="searchInput">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <input type="search" id="searchInput" placeholder="Ara…" autocomplete="off" />
-          </label>
+          <div class="header-search-slot">
+            <label class="search" for="headerSearchInput">
+              <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+              <input type="search" id="headerSearchInput" placeholder="Şirket veya rapor ara…" autocomplete="off" />
+            </label>
+            <div id="headerSearchPanel" class="header-search-panel" hidden></div>
+          </div>
           <div class="header__dd-wrap">
             <button type="button" class="header__notify" id="notifyMenuBtn" aria-label="Bildirimler" aria-expanded="false" aria-haspopup="true" aria-controls="notifyDropdown">
               <i class="fa-solid fa-bell" aria-hidden="true"></i>
-              <span class="header__badge">3</span>
+              <span class="header__badge" hidden>0</span>
             </button>
             <div class="header__dropdown" id="notifyDropdown" role="menu" hidden>
               <p class="header__dropdown-title">Bildirimler</p>
               <ul class="header__dropdown-list">
-                <li><span class="header__dropdown-dot"></span> Yeni rapor PDF’i yüklendi</li>
-                <li><span class="header__dropdown-dot"></span> Şirket kaydı güncellendi</li>
-                <li><span class="header__dropdown-dot"></span> Hatırlatma: periyodik denetim</li>
+                <li><span class="header__dropdown-dot"></span><span>Yükleniyor…</span></li>
               </ul>
             </div>
           </div>
@@ -166,12 +171,8 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
-  <script>
-    console.log("Appwrite SDK yüklendi");
-  </script>
-  <script type="module" src="js/appwrite-config.mjs"></script>
-  <script defer src="js/script.js"></script>
+  <script type="module" src="./js/appwrite-config.mjs"></script>
+  <script defer src="./js/script.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -179,6 +180,6 @@
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script defer src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script defer src="js/qr-generator.js"></script>
+  <script defer src="./js/qr-generator.js"></script>
 </body>
 </html>

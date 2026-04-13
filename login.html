@@ -8,11 +8,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <link rel="stylesheet" href="css/login.css" />
+  <link rel="stylesheet" href="./css/login.css" />
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
+  <script>
+    console.log("Appwrite SDK yüklendi");
+  </script>
 </head>
 <body class="login-page">
   <div class="login-shell">
-    <section class="login-hero" aria-hidden="false">
+    <section class="login-hero" aria-labelledby="loginHeroTitle">
+      <div class="login-hero__mesh" aria-hidden="true"></div>
       <div class="login-hero__waves" aria-hidden="true">
         <div class="login-hero__wave login-hero__wave--3"></div>
         <div class="login-hero__wave login-hero__wave--2"></div>
@@ -20,8 +25,11 @@
       </div>
       <div class="login-hero__content">
         <div class="login-hero__orb" aria-hidden="true"></div>
-        <h1 class="login-hero__title">Welcome to the community</h1>
-        <p class="login-hero__subtitle">Login to explore</p>
+        <p class="login-hero__eyebrow">3N Makine</p>
+        <h1 id="loginHeroTitle" class="login-hero__title">Yönetim paneline hoş geldiniz</h1>
+        <p class="login-hero__subtitle">
+          Raporlar, şirket kayıtları ve QR işlemleri tek yerden. Güvenli oturum için bilgilerinizi girin.
+        </p>
       </div>
     </section>
 
@@ -32,49 +40,61 @@
             <i class="fa-solid fa-gears"></i>
           </div>
           <div class="login-card__titles">
-            <h2 id="loginHeading" class="login-card__heading">Giriş yap</h2>
-            <p class="login-card__hint">Paneline erişmek için bilgilerini gir.</p>
+            <h2 id="loginHeading" class="login-card__heading">Oturum aç</h2>
+            <p class="login-card__hint">Devam etmek için kullanıcı adı ve şifrenizi yazın.</p>
           </div>
         </div>
 
         <form id="loginForm" class="login-form" novalidate>
           <div class="login-field">
-            <label for="loginEmail">E-mail</label>
+            <label for="loginEmail">Kullanıcı adı veya e-posta</label>
             <input
               type="text"
               id="loginEmail"
               name="email"
               autocomplete="username"
-              placeholder="ornek@firma.com"
+              placeholder="örnek@firma.com"
               required
             />
           </div>
-          <div class="login-field">
+          <div class="login-field login-field--password">
             <label for="loginPassword">Şifre</label>
-            <input
-              type="password"
-              id="loginPassword"
-              name="password"
-              autocomplete="current-password"
-              placeholder="••••••••"
-              required
-            />
+            <div class="login-password-wrap">
+              <input
+                type="password"
+                id="loginPassword"
+                name="password"
+                class="login-password-input"
+                autocomplete="current-password"
+                placeholder="Şifrenizi girin"
+                required
+              />
+              <button
+                type="button"
+                class="login-password-toggle"
+                id="loginPasswordToggle"
+                aria-label="Şifreyi göster"
+                aria-pressed="false"
+                title="Şifreyi göster"
+              >
+                <i class="fa-regular fa-eye" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
 
           <p id="loginError" class="login-error" role="alert" hidden></p>
 
-          <button type="submit" class="login-submit">Continue</button>
+          <button type="submit" class="login-submit">
+            <span>Giriş yap</span>
+            <i class="fa-solid fa-arrow-right login-submit__icon" aria-hidden="true"></i>
+          </button>
         </form>
 
-        <p class="login-footer">3N Makine Yönetim Paneli</p>
+        <p class="login-footer">3N Makine · Yönetim paneli</p>
       </div>
     </section>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
-  <script>
-    console.log("Appwrite SDK yüklendi");
-  </script>
-  <script src="js/login.js"></script>
+  <script src="./js/login.js"></script>
 </body>
 </html>

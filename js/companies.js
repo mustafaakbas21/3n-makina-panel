@@ -97,6 +97,30 @@
   function applyFilterAndRender() {
     const q = getSearchQuery();
     renderTable(filterByName(companiesCache, q));
+    scrollToCompanyFromHash();
+  }
+
+  function scrollToCompanyFromHash() {
+    const raw = (window.location.hash || "").replace(/^#/, "");
+    const m = raw.match(/^company-(.+)$/);
+    if (!m) return;
+    const id = decodeURIComponent(m[1]);
+    const tbody = document.getElementById("companiesTableBody");
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll("tr[data-company-id]");
+    var tr = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].getAttribute("data-company-id") === id) {
+        tr = rows[i];
+        break;
+      }
+    }
+    if (!tr) return;
+    tr.classList.add("data-table__row--flash");
+    tr.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(function () {
+      tr.classList.remove("data-table__row--flash");
+    }, 2800);
   }
 
   async function loadCompanies() {

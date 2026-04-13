@@ -4,10 +4,361 @@
  */
 "use strict";
 
+var SESSION_USER_KEY = "3n_session_user";
+
 function getAw() {
   return typeof window.__3nAppwrite !== "undefined" && window.__3nAppwrite
     ? window.__3nAppwrite
     : null;
+}
+
+/** Girişte kaydedilen kullanıcı adı (login.js → localStorage) */
+function getSessionDisplayName() {
+  try {
+    const v = localStorage.getItem(SESSION_USER_KEY);
+    if (v != null && String(v).trim() !== "") return String(v).trim();
+  } catch (e) {
+    /* — */
+  }
+  return "Kullanıcı";
+}
+
+function avatarUrlForName(name) {
+  const n = encodeURIComponent(name || "User");
+  return (
+    "https://ui-avatars.com/api/?name=" +
+    n +
+    "&size=128&background=3b82f6&color=ffffff&bold=true"
+  );
+}
+
+function applySessionUserToHeader() {
+  const display = getSessionDisplayName();
+  const welcome = document.querySelector(".header__welcome");
+  if (welcome && welcome.textContent.indexOf("Hoş Geldin") !== -1) {
+    const nameSpan = welcome.querySelector(".header__name");
+    if (nameSpan) nameSpan.textContent = display;
+  }
+  document.querySelectorAll(".header__user-name").forEach(function (el) {
+    el.textContent = display;
+  });
+  document.querySelectorAll(".header__avatar").forEach(function (img) {
+    if (img && img.tagName === "IMG") {
+      img.src = avatarUrlForName(display);
+      img.alt = display;
+    }
+  });
+}
+
+/** Üst arama + bildirimler için tek seferlik önbellek */
+var headerDataCache = null;
+
+async function ensureHeaderDataCache() {
+  if (headerDataCache) return headerDataCache;
+  const aw = getAw();
+  if (!aw || !aw.databases || !aw.isConfigured()) {
+    headerDataCache = { companies: [], reports: [] };
+    return headerDataCache;
+  }
+  try {
+    const [cRes, rRes] = await Promise.all([
+      aw.databases.listDocuments(aw.DATABASE_ID, aw.COLLECTION_COMPANIES, [
+        aw.Query.orderAsc("name"),
+        aw.Query.limit(500),
+      ]),
+      aw.databases.listDocuments(aw.DATABASE_ID, aw.COLLECTION_REPORTS, [
+        aw.Query.orderDesc("$createdAt"),
+        aw.Query.limit(400),
+      ]),
+    ]);
+    headerDataCache = {
+      companies: aw.normalizeDocuments(cRes.documents || []),
+      reports: aw.normalizeDocuments(rRes.documents || []),
+    };
+  } catch (e) {
+    headerDataCache = { companies: [], reports: [] };
+  }
+  return headerDataCache;
+}
+
+function rowValFlexible(row, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    const v = row[keys[i]];
+    if (v != null && String(v).trim() !== "") return v;
+  }
+  return null;
+}
+
+function parseExpiryForNotify(raw) {
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    const p = raw.slice(0, 10).split("-");
+    return new Date(
+      parseInt(p[0], 10),
+      parseInt(p[1], 10) - 1,
+      parseInt(p[2], 10)
+    );
+  }
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+async function loadHeaderNotifications() {
+  const ul = document.querySelector("#notifyDropdown .header__dropdown-list");
+  const badge = document.querySelector(".header__badge");
+  if (!ul) return;
+
+  ul.innerHTML =
+    '<li class="header__dropdown-item--loading"><span class="header__dropdown-dot"></span><span>Yükleniyor…</span></li>';
+
+  const aw = getAw();
+  if (!aw || !aw.databases || !aw.isConfigured()) {
+    ul.innerHTML =
+      '<li><span class="header__dropdown-dot"></span><span>Appwrite yapılandırması eksik.</span></li>';
+    if (badge) {
+      badge.textContent = "0";
+      badge.hidden = true;
+    }
+    return;
+  }
+
+  const items = [];
+
+  try {
+    const recentReports = await aw.databases.listDocuments(
+      aw.DATABASE_ID,
+      aw.COLLECTION_REPORTS,
+      [aw.Query.orderDesc("$createdAt"), aw.Query.limit(6)]
+    );
+    const docsR = aw.normalizeDocuments(recentReports.documents || []);
+    docsR.forEach(function (row) {
+      const id = row.id != null ? String(row.id) : "";
+      const title = rowValFlexible(row, ["title"]) || "Rapor";
+      const ca = row.createdAt || row.$createdAt;
+      const ts = ca ? new Date(ca).getTime() : 0;
+      const t = String(title);
+      items.push({
+        ts: ts,
+        html:
+          '<li><span class="header__dropdown-dot"></span><a class="header__dropdown-link" href="./reports.html#report-' +
+          encodeURIComponent(id) +
+          '">Yeni rapor: ' +
+          escapeHtml(t.length > 42 ? t.slice(0, 40) + "…" : t) +
+          "</a></li>",
+      });
+    });
+
+    const recentCos = await aw.databases.listDocuments(
+      aw.DATABASE_ID,
+      aw.COLLECTION_COMPANIES,
+      [aw.Query.orderDesc("$updatedAt"), aw.Query.limit(12)]
+    );
+    const docsC = aw.normalizeDocuments(recentCos.documents || []);
+    docsC.forEach(function (row) {
+      const created = row.createdAt || row.$createdAt;
+      const updated = row.updatedAt || row.$updatedAt;
+      const cMs = created ? new Date(created).getTime() : 0;
+      const uMs = updated ? new Date(updated).getTime() : 0;
+      if (!uMs || uMs <= cMs + 60000) return;
+      const id = row.id != null ? String(row.id) : "";
+      const name = rowValFlexible(row, ["name"]) || "Şirket";
+      const n = String(name);
+      items.push({
+        ts: uMs,
+        html:
+          '<li><span class="header__dropdown-dot"></span><a class="header__dropdown-link" href="./companies.html#company-' +
+          encodeURIComponent(id) +
+          '">Şirket güncellendi: ' +
+          escapeHtml(n.length > 36 ? n.slice(0, 34) + "…" : n) +
+          "</a></li>",
+      });
+    });
+
+    const allReports = (await ensureHeaderDataCache()).reports || [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    allReports.forEach(function (row) {
+      const raw = rowValFlexible(row, [
+        "expiryDate",
+        "expiry_date",
+        "validUntil",
+        "valid_until",
+      ]);
+      const exp = parseExpiryForNotify(raw);
+      if (!exp) return;
+      exp.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((exp.getTime() - today.getTime()) / 86400000);
+      if (diffDays < 0 || diffDays > 30) return;
+      const id = row.id != null ? String(row.id) : "";
+      const title = rowValFlexible(row, ["title"]) || "Rapor";
+      const t = String(title);
+      items.push({
+        ts: exp.getTime(),
+        html:
+          '<li><span class="header__dropdown-dot"></span><a class="header__dropdown-link" href="./reports.html#report-' +
+          encodeURIComponent(id) +
+          '">Geçerlilik ' +
+          (diffDays === 0
+            ? "bugün bitiyor"
+            : diffDays + " gün içinde bitiyor") +
+          ": " +
+          escapeHtml(t.length > 32 ? t.slice(0, 30) + "…" : t) +
+          "</a></li>",
+      });
+    });
+  } catch (e) {
+    ul.innerHTML =
+      '<li><span class="header__dropdown-dot"></span><span>Bildirimler yüklenemedi.</span></li>';
+    if (badge) {
+      badge.textContent = "!";
+      badge.hidden = false;
+    }
+    return;
+  }
+
+  items.sort(function (a, b) {
+    return b.ts - a.ts;
+  });
+  const max = 10;
+  const slice = items.slice(0, max);
+  if (slice.length === 0) {
+    ul.innerHTML =
+      '<li><span class="header__dropdown-dot"></span><span>Şu an gösterilecek bildirim yok.</span></li>';
+    if (badge) {
+      badge.textContent = "0";
+      badge.hidden = true;
+    }
+    return;
+  }
+
+  ul.innerHTML = slice.map(function (x) {
+    return x.html;
+  }).join("");
+  if (badge) {
+    badge.textContent = String(slice.length);
+    badge.hidden = false;
+  }
+}
+
+function closeHeaderSearchPanel() {
+  const p = document.getElementById("headerSearchPanel");
+  if (p) {
+    p.hidden = true;
+    p.innerHTML = "";
+  }
+}
+
+function wireHeaderGlobalSearch() {
+  const input = document.getElementById("headerSearchInput");
+  const panel = document.getElementById("headerSearchPanel");
+  const slot = document.querySelector(".header-search-slot");
+  if (!input || !panel || !slot) return;
+
+  let t = null;
+  input.addEventListener(
+    "input",
+    function () {
+      if (t) clearTimeout(t);
+      t = setTimeout(function () {
+        void renderHeaderSearchResults(input.value);
+      }, 220);
+    }
+  );
+  input.addEventListener("focus", function () {
+    if (input.value.trim()) void renderHeaderSearchResults(input.value);
+  });
+  document.addEventListener("click", function (e) {
+    if (!slot.contains(e.target)) closeHeaderSearchPanel();
+  });
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeHeaderSearchPanel();
+  });
+}
+
+async function renderHeaderSearchResults(q) {
+  const panel = document.getElementById("headerSearchPanel");
+  if (!panel) return;
+  const query = String(q || "")
+    .trim()
+    .toLowerCase();
+  if (query.length < 1) {
+    closeHeaderSearchPanel();
+    return;
+  }
+
+  const data = await ensureHeaderDataCache();
+  const companies = data.companies || [];
+  const reports = data.reports || [];
+
+  const matchCompany = companies.filter(function (c) {
+    const n = rowValFlexible(c, ["name"]);
+    return n && String(n).toLowerCase().indexOf(query) !== -1;
+  });
+  const matchReports = reports.filter(function (r) {
+    const title = rowValFlexible(r, ["title"]);
+    const t = title != null ? String(title).toLowerCase() : "";
+    const cid = rowValFlexible(r, ["companyId", "company_id"]);
+    let cname = "";
+    if (cid != null) {
+      const co = companies.find(function (x) {
+        return String(x.id) === String(cid);
+      });
+      cname =
+        co && rowValFlexible(co, ["name"])
+          ? String(rowValFlexible(co, ["name"])).toLowerCase()
+          : "";
+    }
+    return t.indexOf(query) !== -1 || (cname && cname.indexOf(query) !== -1);
+  });
+
+  const lines = [];
+  matchCompany.slice(0, 6).forEach(function (c) {
+    const id = c.id != null ? String(c.id) : "";
+    const name = rowValFlexible(c, ["name"]) || "Şirket";
+    lines.push({
+      href: "./companies.html#company-" + encodeURIComponent(id),
+      icon: "fa-building",
+      text: String(name),
+      sub: "Şirket",
+    });
+  });
+  matchReports.slice(0, 8).forEach(function (r) {
+    const id = r.id != null ? String(r.id) : "";
+    const title = rowValFlexible(r, ["title"]) || "Rapor";
+    lines.push({
+      href: "./reports.html#report-" + encodeURIComponent(id),
+      icon: "fa-file-lines",
+      text: String(title),
+      sub: "Rapor",
+    });
+  });
+
+  if (lines.length === 0) {
+    panel.hidden = false;
+    panel.innerHTML =
+      '<div class="header-search-panel__empty">Sonuç yok.</div>';
+    return;
+  }
+
+  panel.hidden = false;
+  panel.innerHTML =
+    '<ul class="header-search-panel__list">' +
+    lines
+      .map(function (L) {
+        return (
+          '<li><a class="header-search-panel__link" href="' +
+          escapeHtml(L.href) +
+          '"><i class="fa-solid ' +
+          escapeHtml(L.icon) +
+          '" aria-hidden="true"></i><span class="header-search-panel__text"><span class="header-search-panel__title">' +
+          escapeHtml(L.text) +
+          '</span><span class="header-search-panel__meta">' +
+          escapeHtml(L.sub) +
+          "</span></span></a></li>"
+        );
+      })
+      .join("") +
+    "</ul>";
 }
 
 // ---------------------------------------------------------------------------
@@ -514,8 +865,9 @@ function wireHeaderDropdowns() {
       if (window.confirm("Çıkış yapmak istiyor musunuz?")) {
         try {
           localStorage.removeItem("isLoggedIn");
+          localStorage.removeItem(SESSION_USER_KEY);
         } catch (err) {}
-        window.location.href = "login.html";
+        window.location.href = "./login.html";
       }
     });
   }
@@ -737,8 +1089,9 @@ function wireSidebarLogout() {
     e.preventDefault();
     try {
       localStorage.removeItem("isLoggedIn");
+      localStorage.removeItem(SESSION_USER_KEY);
     } catch (err) {}
-    window.location.href = "login.html";
+    window.location.href = "./login.html";
   });
 }
 
@@ -746,12 +1099,36 @@ function wireSidebarLogout() {
 // Giriş noktası
 // ---------------------------------------------------------------------------
 
+function scheduleHeaderAppwriteFeatures() {
+  var n = 0;
+  function tick() {
+    const aw = getAw();
+    if (aw && aw.isConfigured && aw.isConfigured()) {
+      void ensureHeaderDataCache().then(function () {
+        void loadHeaderNotifications();
+      });
+      wireHeaderGlobalSearch();
+      return;
+    }
+    n += 1;
+    if (n < 80) {
+      setTimeout(tick, 50);
+    } else {
+      void loadHeaderNotifications();
+      wireHeaderGlobalSearch();
+    }
+  }
+  tick();
+}
+
 document.addEventListener("DOMContentLoaded", function () {
+  applySessionUserToHeader();
   setActiveSidebarNav();
   wireSidebarLogout();
 
   if (document.getElementById("notifyMenuBtn")) {
     wireHeaderDropdowns();
+    scheduleHeaderAppwriteFeatures();
   }
 
   if (document.getElementById("recent-reports-list")) {

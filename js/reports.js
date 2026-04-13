@@ -171,6 +171,30 @@
 
   function applyFiltersAndRender() {
     renderReportsTable(reportsCache);
+    scrollToReportFromHash();
+  }
+
+  function scrollToReportFromHash() {
+    const raw = (window.location.hash || "").replace(/^#/, "");
+    const m = raw.match(/^report-(.+)$/);
+    if (!m) return;
+    const id = decodeURIComponent(m[1]);
+    const tbody = document.getElementById("reportsTableBody");
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll("tr[data-report-id]");
+    var tr = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].getAttribute("data-report-id") === id) {
+        tr = rows[i];
+        break;
+      }
+    }
+    if (!tr) return;
+    tr.classList.add("data-table__row--flash");
+    tr.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(function () {
+      tr.classList.remove("data-table__row--flash");
+    }, 2800);
   }
 
   function fillCompanyDropdown(companies) {
