@@ -65,11 +65,13 @@
 
   function assignNewQrFileName() {
     var aw = getAw();
-    /** window.Appwrite.ID.unique() bazen hatalı "unique()" dizgisi döndürebiliyor — yalnızca __3nAppwrite.newUniqueFileId */
+    /** Depo fileId — appwrite-config.generateFileId() (SDK ID.unique kullanılmaz) */
     currentQrStorageId =
-      aw && typeof aw.newUniqueFileId === "function"
-        ? aw.newUniqueFileId()
-        : "";
+      aw && typeof aw.generateFileId === "function"
+        ? aw.generateFileId()
+        : aw && typeof aw.newUniqueFileId === "function"
+          ? aw.newUniqueFileId()
+          : "";
     var firma = sanitizeStorageFileLabel(getQrStudioCompanyDisplayName());
     currentQrDisplayFileName =
       "3N_Makina_Raporu_" + firma + "_" + Date.now() + ".pdf";
@@ -744,6 +746,7 @@
 
       console.log("[3N] storage.createFile bucket / fileId:", QR_STORAGE_BUCKET_ID, fileIdForUpload);
 
+      /** createFile(bucketId, fileId, file) — fileId, QR üretilirken generateFileId() ile oluşturulan currentQrStorageId ile aynı olmalı (burada yeniden generateFileId çağırılmaz). */
       const uploadResult = await storageApi.createFile(
         QR_STORAGE_BUCKET_ID,
         fileIdForUpload,

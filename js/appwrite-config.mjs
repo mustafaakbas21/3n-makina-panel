@@ -16,9 +16,7 @@ if (!AppwriteGlobal || !AppwriteGlobal.Client) {
   );
 }
 
-/** `ID` adı global/window ile çakışabiliyor — Appwrite sınıfı açık isimle alınır */
-const { Client, Account, Databases, Storage, ID: AppwriteIdClass, Query } =
-  AppwriteGlobal;
+const { Client, Account, Databases, Storage, Query } = AppwriteGlobal;
 
 /** Appwrite Storage fileId: en fazla 36 karakter; a-z, A-Z, 0-9, _ ; başta _ olamaz. */
 function isValidStorageFileId(id) {
@@ -30,60 +28,28 @@ function isValidStorageFileId(id) {
 }
 
 /**
- * Appwrite SDK ID.unique ile aynı mantık (SDK bozuk/beklenmedik çıktı verirse).
+ * Appwrite SDK ID.unique() kullanılmaz — Storage/DB için yerel geçerli kimlik.
+ * (Appwrite: en fazla 36 karakter; a-z, A-Z, 0-9, _)
  */
-function generateFallbackUniqueId() {
-  var now = new Date();
-  var sec = Math.floor(now.getTime() / 1000);
-  var msec = now.getMilliseconds();
-  var hexTimestamp = sec.toString(16) + msec.toString(16).padStart(5, "0");
-  var randomPadding = "";
-  for (var i = 0; i < 7; i++) {
-    randomPadding += Math.floor(Math.random() * 16).toString(16);
-  }
-  var out = (hexTimestamp + randomPadding).slice(0, 36);
-  if (!isValidStorageFileId(out)) {
-    var s = "";
-    for (var j = 0; j < 24; j++) {
-      s += Math.floor(Math.random() * 16).toString(16);
+function generateFileId() {
+  var id =
+    "file_" +
+    Date.now().toString(36) +
+    Math.random().toString(36).slice(2, 11);
+  id = id.slice(0, 36);
+  if (!isValidStorageFileId(id)) {
+    var alt = "";
+    for (var i = 0; i < 32; i++) {
+      alt += Math.floor(Math.random() * 16).toString(16);
     }
-    out = s.slice(0, 36);
+    return ("f" + alt).slice(0, 36);
   }
-  return out;
+  return id;
 }
 
-/**
- * Önce Appwrite ID.unique(); geçersiz veya literal "unique()" ise yedek üret.
- */
+/** Eski çağrılar için — generateFileId ile aynı */
 function newUniqueFileId() {
-  var IdClass = AppwriteIdClass;
-  if (!IdClass || typeof IdClass.unique !== "function") {
-    console.warn("[3N] AppwriteIdClass.unique yok, yedek kimlik üretiliyor.");
-    return generateFallbackUniqueId();
-  }
-
-  var uid = "";
-  try {
-    uid = IdClass.unique();
-  } catch (err) {
-    console.warn("[3N] ID.unique() hata verdi, yedek kullanılıyor:", err);
-    return generateFallbackUniqueId();
-  }
-
-  uid = uid != null ? String(uid).trim() : "";
-  if (
-    !uid ||
-    uid === "unique()" ||
-    /[()]/.test(uid) ||
-    !isValidStorageFileId(uid)
-  ) {
-    console.warn(
-      "[3N] ID.unique() geçersiz çıktı, yedek kullanılıyor:",
-      uid
-    );
-    return generateFallbackUniqueId();
-  }
-  return uid;
+  return generateFileId();
 }
 
 const client = new Client()
@@ -195,8 +161,8 @@ window.__3nAppwrite = {
   account: account,
   databases: databases,
   storage: storage,
-  ID: AppwriteIdClass,
   Query: Query,
+  generateFileId: generateFileId,
   newUniqueFileId: newUniqueFileId,
   isValidStorageFileId: isValidStorageFileId,
   buildStorageFileViewUrl: buildStorageFileViewUrl,
@@ -215,3 +181,5 @@ window.__3nAppwrite = {
   getStorageFileViewUrl: getStorageFileViewUrl,
   blobToFile: blobToFile,
 };
+
+export { generateFileId, newUniqueFileId, isValidStorageFileId };
