@@ -16,7 +16,9 @@ if (!AppwriteGlobal || !AppwriteGlobal.Client) {
   );
 }
 
-const { Client, Account, Databases, Storage, ID, Query } = AppwriteGlobal;
+/** `ID` adı global/window ile çakışabiliyor — Appwrite sınıfı açık isimle alınır */
+const { Client, Account, Databases, Storage, ID: AppwriteIdClass, Query } =
+  AppwriteGlobal;
 
 /** Appwrite Storage fileId: en fazla 36 karakter; a-z, A-Z, 0-9, _ ; başta _ olamaz. */
 function isValidStorageFileId(id) {
@@ -28,27 +30,58 @@ function isValidStorageFileId(id) {
 }
 
 /**
- * CDN: window.Appwrite.ID.unique() — asla string "unique()" değil.
- * Kimlik üretilemezse boş döner (çağıran kod kontrol eder).
+ * Appwrite SDK ID.unique ile aynı mantık (SDK bozuk/beklenmedik çıktı verirse).
+ */
+function generateFallbackUniqueId() {
+  var now = new Date();
+  var sec = Math.floor(now.getTime() / 1000);
+  var msec = now.getMilliseconds();
+  var hexTimestamp = sec.toString(16) + msec.toString(16).padStart(5, "0");
+  var randomPadding = "";
+  for (var i = 0; i < 7; i++) {
+    randomPadding += Math.floor(Math.random() * 16).toString(16);
+  }
+  var out = (hexTimestamp + randomPadding).slice(0, 36);
+  if (!isValidStorageFileId(out)) {
+    var s = "";
+    for (var j = 0; j < 24; j++) {
+      s += Math.floor(Math.random() * 16).toString(16);
+    }
+    out = s.slice(0, 36);
+  }
+  return out;
+}
+
+/**
+ * Önce Appwrite ID.unique(); geçersiz veya literal "unique()" ise yedek üret.
  */
 function newUniqueFileId() {
-  var IdClass =
-    (typeof window !== "undefined" && window.Appwrite && window.Appwrite.ID) ||
-    ID;
+  var IdClass = AppwriteIdClass;
   if (!IdClass || typeof IdClass.unique !== "function") {
-    console.error("[3N] window.Appwrite.ID.unique kullanılamıyor (CDN sırası?).");
-    return "";
+    console.warn("[3N] AppwriteIdClass.unique yok, yedek kimlik üretiliyor.");
+    return generateFallbackUniqueId();
   }
-  var uid = IdClass.unique();
-  uid = uid != null ? String(uid).trim() : "";
-  if (!isValidStorageFileId(uid)) {
-    console.error("[3N] ID.unique() geçersiz değer döndü:", uid);
+
+  var uid = "";
+  try {
     uid = IdClass.unique();
-    uid = uid != null ? String(uid).trim() : "";
+  } catch (err) {
+    console.warn("[3N] ID.unique() hata verdi, yedek kullanılıyor:", err);
+    return generateFallbackUniqueId();
   }
-  if (!isValidStorageFileId(uid)) {
-    console.error("[3N] ID.unique() ikinci denemede de geçersiz:", uid);
-    return "";
+
+  uid = uid != null ? String(uid).trim() : "";
+  if (
+    !uid ||
+    uid === "unique()" ||
+    /[()]/.test(uid) ||
+    !isValidStorageFileId(uid)
+  ) {
+    console.warn(
+      "[3N] ID.unique() geçersiz çıktı, yedek kullanılıyor:",
+      uid
+    );
+    return generateFallbackUniqueId();
   }
   return uid;
 }
@@ -162,7 +195,7 @@ window.__3nAppwrite = {
   account: account,
   databases: databases,
   storage: storage,
-  ID: ID,
+  ID: AppwriteIdClass,
   Query: Query,
   newUniqueFileId: newUniqueFileId,
   isValidStorageFileId: isValidStorageFileId,

@@ -64,22 +64,12 @@
   }
 
   function assignNewQrFileName() {
-    var fileId = "";
-    if (
-      typeof window !== "undefined" &&
-      window.Appwrite &&
-      window.Appwrite.ID &&
-      typeof window.Appwrite.ID.unique === "function"
-    ) {
-      fileId = window.Appwrite.ID.unique();
-    } else {
-      var aw = getAw();
-      fileId =
-        aw && typeof aw.newUniqueFileId === "function"
-          ? aw.newUniqueFileId()
-          : "";
-    }
-    currentQrStorageId = fileId;
+    var aw = getAw();
+    /** window.Appwrite.ID.unique() bazen hatalı "unique()" dizgisi döndürebiliyor — yalnızca __3nAppwrite.newUniqueFileId */
+    currentQrStorageId =
+      aw && typeof aw.newUniqueFileId === "function"
+        ? aw.newUniqueFileId()
+        : "";
     var firma = sanitizeStorageFileLabel(getQrStudioCompanyDisplayName());
     currentQrDisplayFileName =
       "3N_Makina_Raporu_" + firma + "_" + Date.now() + ".pdf";
@@ -741,21 +731,11 @@
       const pdfBlob = buildPdfBlobFromFabric(fabricCanvas);
       const pdfFile = aw.blobToFile(pdfBlob, currentQrDisplayFileName);
 
-      var fileIdForUpload =
-        currentQrStorageId &&
-        aw.isValidStorageFileId &&
-        aw.isValidStorageFileId(currentQrStorageId)
-          ? currentQrStorageId
-          : typeof window !== "undefined" &&
-              window.Appwrite &&
-              window.Appwrite.ID &&
-              typeof window.Appwrite.ID.unique === "function"
-            ? window.Appwrite.ID.unique()
-            : "";
+      var fileIdForUpload = currentQrStorageId;
 
       if (!fileIdForUpload) {
         throw new Error(
-          "Depo dosya kimliği üretilemedi (window.Appwrite.ID.unique)."
+          "Depo dosya kimliği yok — newUniqueFileId başarısız (sayfayı yenileyin)."
         );
       }
       if (aw.isValidStorageFileId && !aw.isValidStorageFileId(fileIdForUpload)) {
