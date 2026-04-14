@@ -41,6 +41,8 @@
   let pdfJsDocument = null;
   let pdfPageCount = 0;
   let pdfCurrentPage = 1;
+  /** Karekod hangi PDF sayfasına yerleştirildi (1 tabanlı; çok sayfa dışa aktarım için) */
+  let qrOverlayPdfPage = 0;
 
   function sanitizeStorageFileLabel(raw) {
     var s = String(raw || "Belge")
@@ -118,12 +120,14 @@
     }
     qrFabricImage = null;
     lastQrDataUrl = "";
+    qrOverlayPdfPage = 0;
   }
 
   function clearPdfSession() {
     pdfJsDocument = null;
     pdfPageCount = 0;
     pdfCurrentPage = 1;
+    qrOverlayPdfPage = 0;
     const bar = document.getElementById("qrPdfPageBar");
     if (bar) bar.hidden = true;
   }
@@ -199,6 +203,150 @@
         setLoading(false);
       }
     }
+  }
+
+  /**
+   * Tek PDF sayfasını önizleme ile aynı çözünürlükte rasterler (Fabric’a basmadan).
+   */
+  async function renderPdfPageToRasterMeta(pageNum) {
+    if (!pdfJsDocument || pdfPageCount < 1) return null;
+    var n = parseInt(String(pageNum), 10);
+    if (Number.isNaN(n)) n = 1;
+    n = Math.max(1, Math.min(pdfPageCount, n));
+    const page = await pdfJsDocument.getPage(n);
+    const baseVp = page.getViewport({ scale: 1 });
+    var rasterScale = PDF_MAX_RASTER_WIDTH / baseVp.width;
+    if (baseVp.width * rasterScale < PDF_MIN_RASTER_WIDTH) {
+      rasterScale = PDF_MIN_RASTER_WIDTH / baseVp.width;
+    }
+    rasterScale = Math.min(rasterScale, 3.25);
+    const viewport = page.getViewport({ scale: rasterScale });
+    const tmp = document.createElement("canvas");
+    const ctx = tmp.getContext("2d", { alpha: false });
+    if (!ctx) {
+      throw new Error("Tarayıcı canvas 2D desteklemiyor.");
+    }
+    ctx.imageSmoothingEnabled = true;
+    if ("imageSmoothingQuality" in ctx) {
+      ctx.imageSmoothingQuality = "high";
+    }
+    tmp.width = Math.floor(viewport.width);
+    tmp.height = Math.floor(viewport.height);
+    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+    const dataUrl = tmp.toDataURL("image/png");
+    const pixelW = tmp.width;
+    const pixelH = tmp.height;
+    const scale = Math.min(1, MAX_CANVAS_WIDTH / pixelW);
+    const vw = pixelW * scale;
+    const vh = pixelH * scale;
+    return { dataUrl: dataUrl, vw: vw, vh: vh, pixelW: pixelW, pixelH: pixelH };
+  }
+
+  /**
+   * Tam çözünürlükte sayfa rasterına QR yerleştirir (Fabric ölçüleri ile hizalı).
+   */
+  function mergeQrOntoPageRaster(meta, qrObj, qrDataUrl, fcW, fcH) {
+    return new Promise(function (resolve, reject) {
+      var c = document.createElement("canvas");
+      c.width = meta.pixelW;
+      c.height = meta.pixelH;
+      var ctx = c.getContext("2d");
+      if (!ctx) {
+        reject(new Error("2D context oluşturulamadı."));
+        return;
+      }
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      var bg = new Image();
+      bg.crossOrigin = "anonymous";
+      bg.onload = function () {
+        ctx.drawImage(bg, 0, 0);
+        var qrImg = new Image();
+        qrImg.crossOrigin = "anonymous";
+        qrImg.onload = function () {
+          try {
+            var sx = meta.pixelW / fcW;
+            var sy = meta.pixelH / fcH;
+            var qw = qrObj.getScaledWidth() * sx;
+            var qh = qrObj.getScaledHeight() * sy;
+            var qx = (qrObj.left - qrObj.getScaledWidth() / 2) * sx;
+            var qy = (qrObj.top - qrObj.getScaledHeight() / 2) * sy;
+            ctx.drawImage(qrImg, qx, qy, qw, qh);
+            resolve(c.toDataURL("image/png"));
+          } catch (e) {
+            reject(e);
+          }
+        };
+        qrImg.onerror = function () {
+          reject(new Error("QR görüntüsü yüklenemedi."));
+        };
+        qrImg.src = qrDataUrl;
+      };
+      bg.onerror = function () {
+        reject(new Error("Sayfa görüntüsü yüklenemedi."));
+      };
+      bg.src = meta.dataUrl;
+    });
+  }
+
+  /**
+   * Çok sayfalı PDF: tüm sayfalar; QR yalnızca qrOverlayPdfPage üzerinde.
+   * Tek sayfa / PDF değilse mevcut Fabric tek tuval çıktısı.
+   */
+  async function buildExportPdfBlob() {
+    if (
+      !pdfJsDocument ||
+      pdfPageCount < 2 ||
+      !qrOverlayPdfPage ||
+      qrOverlayPdfPage < 1 ||
+      qrOverlayPdfPage > pdfPageCount ||
+      !qrFabricImage ||
+      !lastQrDataUrl
+    ) {
+      return buildPdfBlobFromFabric(fabricCanvas);
+    }
+
+    if (typeof window.jspdf === "undefined" || !window.jspdf.jsPDF) {
+      throw new Error("jsPDF yüklenmedi.");
+    }
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const fcW = fabricCanvas.getWidth();
+    const fcH = fabricCanvas.getHeight();
+    const qrUrlSnap = lastQrDataUrl;
+    const qrObjSnap = qrFabricImage;
+    const qrPageSnap = qrOverlayPdfPage;
+
+    for (var p = 1; p <= pdfPageCount; p++) {
+      if (p > 1) {
+        pdf.addPage();
+      }
+      const meta = await renderPdfPageToRasterMeta(p);
+      if (!meta) {
+        throw new Error("PDF sayfası rasterlenemedi: " + p);
+      }
+      if (p !== qrPageSnap) {
+        pdf.addImage(meta.dataUrl, "PNG", 0, 0, pageW, pageH);
+      } else {
+        const merged = await mergeQrOntoPageRaster(
+          meta,
+          qrObjSnap,
+          qrUrlSnap,
+          fcW,
+          fcH
+        );
+        pdf.addImage(merged, "PNG", 0, 0, pageW, pageH);
+      }
+    }
+    return pdf.output("blob");
   }
 
   function buildPdfBlobFromFabric(fc) {
@@ -659,6 +807,8 @@
           img.setCoords();
           fabricCanvas.requestRenderAll();
           qrFabricImage = img;
+          qrOverlayPdfPage =
+            pdfJsDocument && pdfPageCount > 0 ? pdfCurrentPage : 0;
           resolve();
         },
         { crossOrigin: "anonymous" }
@@ -730,7 +880,7 @@
         );
       }
 
-      const pdfBlob = buildPdfBlobFromFabric(fabricCanvas);
+      const pdfBlob = await buildExportPdfBlob();
       const pdfFile = aw.blobToFile(pdfBlob, currentQrDisplayFileName);
 
       var fileIdForUpload = currentQrStorageId;
