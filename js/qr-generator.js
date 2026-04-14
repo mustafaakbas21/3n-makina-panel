@@ -24,7 +24,10 @@
   /** QR kaynak görüntüsü (küçültülünce/büyütülünce okunabilir kalsın) */
   const QR_SOURCE_SIZE = 480;
 
-  /** Appwrite Storage fileId (newUniqueFileId() ile) — QR URL ve createFile aynı kimlik */
+  /** Appwrite konsol bucket id — QR URL ve createFile ile aynı */
+  const QR_STORAGE_BUCKET_ID = "69dd6d03000313133460";
+
+  /** Appwrite Storage fileId — QR’daki URL ile yüklemedeki fileId aynı olmalı (CDN ID.unique) */
   let currentQrStorageId = "";
   /** İndirme / File.name için görünen PDF adı (özel karakterler sanitize edilir) */
   let currentQrDisplayFileName = "";
@@ -61,11 +64,22 @@
   }
 
   function assignNewQrFileName() {
-    const aw = getAw();
-    currentQrStorageId =
-      aw && typeof aw.newUniqueFileId === "function"
-        ? aw.newUniqueFileId()
-        : "";
+    var fileId = "";
+    if (
+      typeof window !== "undefined" &&
+      window.Appwrite &&
+      window.Appwrite.ID &&
+      typeof window.Appwrite.ID.unique === "function"
+    ) {
+      fileId = window.Appwrite.ID.unique();
+    } else {
+      var aw = getAw();
+      fileId =
+        aw && typeof aw.newUniqueFileId === "function"
+          ? aw.newUniqueFileId()
+          : "";
+    }
+    currentQrStorageId = fileId;
     var firma = sanitizeStorageFileLabel(getQrStudioCompanyDisplayName());
     currentQrDisplayFileName =
       "3N_Makina_Raporu_" + firma + "_" + Date.now() + ".pdf";
@@ -578,6 +592,25 @@
 
     const url = getPredictedPublicUrl().trim();
     if (!url) {
+      var diagAw = getAw();
+      var error = new Error("getPredictedPublicUrl boş — QR URL üretilemedi");
+      error.context = {
+        currentQrStorageId: currentQrStorageId,
+        hasWindowAppwrite: !!(
+          typeof window !== "undefined" && window.Appwrite
+        ),
+        hasAppwriteID: !!(
+          typeof window !== "undefined" &&
+          window.Appwrite &&
+          window.Appwrite.ID
+        ),
+        has3nAppwrite: !!(
+          typeof window !== "undefined" && window.__3nAppwrite
+        ),
+        isConfigured: diagAw && diagAw.isConfigured ? diagAw.isConfigured() : null,
+        bucket: diagAw && diagAw.BUCKET_REPORTS,
+      };
+      console.error("APPWRITE DETAYLI HATA:", error);
       window.alert(
         "Kalıcı dosya adresi oluşturulamadı. Appwrite yapılandırmasını (appwrite-config.mjs) kontrol edin."
       );
@@ -587,7 +620,8 @@
     let dataUrl;
     try {
       dataUrl = await generateQrDataUrlFromText(url);
-    } catch (e) {
+    } catch (error) {
+      console.error("APPWRITE DETAYLI HATA:", error);
       window.alert("Karekod oluşturulamadı.");
       return;
     }
@@ -697,16 +731,42 @@
     setLoading(true, "PDF oluşturuluyor ve yükleniyor…");
 
     try {
+      const storageApi = aw.storage;
+      if (!storageApi || typeof storageApi.createFile !== "function") {
+        throw new Error(
+          "aw.storage.createFile yok — appwrite-config.mjs ve CDN sırasını kontrol edin."
+        );
+      }
+
       const pdfBlob = buildPdfBlobFromFabric(fabricCanvas);
       const pdfFile = aw.blobToFile(pdfBlob, currentQrDisplayFileName);
 
-      console.log(
-        "[3N] storage.createFile fileId (fonksiyon çıktısı olmalı):",
-        currentQrStorageId
-      );
-      const uploadResult = await aw.storage.createFile(
-        aw.BUCKET_REPORTS,
-        currentQrStorageId,
+      var fileIdForUpload =
+        currentQrStorageId &&
+        aw.isValidStorageFileId &&
+        aw.isValidStorageFileId(currentQrStorageId)
+          ? currentQrStorageId
+          : typeof window !== "undefined" &&
+              window.Appwrite &&
+              window.Appwrite.ID &&
+              typeof window.Appwrite.ID.unique === "function"
+            ? window.Appwrite.ID.unique()
+            : "";
+
+      if (!fileIdForUpload) {
+        throw new Error(
+          "Depo dosya kimliği üretilemedi (window.Appwrite.ID.unique)."
+        );
+      }
+      if (aw.isValidStorageFileId && !aw.isValidStorageFileId(fileIdForUpload)) {
+        throw new Error("Üretilen dosya kimliği geçersiz.");
+      }
+
+      console.log("[3N] storage.createFile bucket / fileId:", QR_STORAGE_BUCKET_ID, fileIdForUpload);
+
+      const uploadResult = await storageApi.createFile(
+        QR_STORAGE_BUCKET_ID,
+        fileIdForUpload,
         pdfFile
       );
       console.log("Appwrite'dan Dönen Dosya Cevabı:", uploadResult);
@@ -749,9 +809,10 @@
       );
 
       assignNewQrFileName();
-    } catch (e) {
+    } catch (error) {
       setLoading(false);
-      window.alert(e && e.message ? e.message : String(e));
+      console.error("APPWRITE DETAYLI HATA:", error);
+      window.alert(error && error.message ? error.message : String(error));
     }
   }
 
@@ -780,9 +841,11 @@
         opt.textContent = row.name != null ? String(row.name) : "—";
         sel.appendChild(opt);
       });
-    } catch (e) {
+    } catch (error) {
+      console.error("APPWRITE DETAYLI HATA:", error);
       window.alert(
-        "Şirket listesi yüklenemedi: " + (e && e.message ? e.message : String(e))
+        "Şirket listesi yüklenemedi: " +
+          (error && error.message ? error.message : String(error))
       );
     }
   }
@@ -886,9 +949,11 @@
     if (addBtn) addBtn.addEventListener("click", addQrToCanvas);
     if (completeBtn) completeBtn.addEventListener("click", completeWorkflow);
 
-    loadCompanies().catch(function (e) {
+    loadCompanies().catch(function (error) {
+      console.error("APPWRITE DETAYLI HATA:", error);
       window.alert(
-        "Şirket listesi yüklenemedi: " + (e && e.message ? e.message : String(e))
+        "Şirket listesi yüklenemedi: " +
+          (error && error.message ? error.message : String(error))
       );
     });
   }
