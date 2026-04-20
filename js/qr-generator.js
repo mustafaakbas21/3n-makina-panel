@@ -109,28 +109,42 @@
     return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
   }
 
-  /** Aynı PDF blob’unu kullanıcının bilgisayarına indirir (depo yüklemesiyle birlikte). */
-  function triggerPdfBlobDownload(blob, fileName) {
-    if (!blob) return;
+  /**
+   * Rapor deposu (reports.js) ile aynı: depodaki PDF URL’sini fetch + blob ile indirir.
+   * Uzun async zincirinden sonra blob: URL ile programatik indirme çoğu tarayıcıda engellenebildiği için
+   * yükleme sonrası publicUrl kullanılır.
+   */
+  function triggerPdfDownload(url, filename) {
+    if (!url || !String(url).trim()) return;
     var name =
-      fileName && String(fileName).trim()
-        ? String(fileName).trim()
+      filename && String(filename).trim()
+        ? String(filename).trim()
         : "3N_Makina_Raporu.pdf";
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function () {
-      try {
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        /* yoksay */
-      }
-    }, 4000);
+    fetch(String(url).trim(), { mode: "cors", credentials: "include" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.blob();
+      })
+      .then(function (blob) {
+        var a = document.createElement("a");
+        var u = URL.createObjectURL(blob);
+        a.href = u;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(u);
+      })
+      .catch(function () {
+        var a = document.createElement("a");
+        a.href = String(url).trim();
+        a.download = name;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
   }
 
   function disposeFabric() {
@@ -907,8 +921,6 @@
       const pdfBlob = await buildExportPdfBlob();
       const pdfFile = aw.blobToFile(pdfBlob, currentQrDisplayFileName);
 
-      triggerPdfBlobDownload(pdfBlob, currentQrDisplayFileName);
-
       var fileIdForUpload = currentQrStorageId;
 
       if (!fileIdForUpload) {
@@ -938,6 +950,8 @@
           "Yükleme yanıtında geçerli dosya kimliği ($id) yok; PDF adresi oluşturulamadı."
         );
       }
+
+      triggerPdfDownload(publicUrl, currentQrDisplayFileName);
 
       const insertPayload = {
         title: title,
