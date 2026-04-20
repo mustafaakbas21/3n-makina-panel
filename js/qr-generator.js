@@ -109,6 +109,30 @@
     return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
   }
 
+  /** Aynı PDF blob’unu kullanıcının bilgisayarına indirir (depo yüklemesiyle birlikte). */
+  function triggerPdfBlobDownload(blob, fileName) {
+    if (!blob) return;
+    var name =
+      fileName && String(fileName).trim()
+        ? String(fileName).trim()
+        : "3N_Makina_Raporu.pdf";
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () {
+      try {
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        /* yoksay */
+      }
+    }, 4000);
+  }
+
   function disposeFabric() {
     if (fabricCanvas) {
       try {
@@ -883,6 +907,8 @@
       const pdfBlob = await buildExportPdfBlob();
       const pdfFile = aw.blobToFile(pdfBlob, currentQrDisplayFileName);
 
+      triggerPdfBlobDownload(pdfBlob, currentQrDisplayFileName);
+
       var fileIdForUpload = currentQrStorageId;
 
       if (!fileIdForUpload) {
@@ -938,7 +964,7 @@
 
       setLoading(false);
       window.alert(
-        "İşlem tamamlandı. PDF kaydedildi ve rapor listesine eklendi.\n\nBir sonraki belge için karekodu yenilemek üzere «Karekodu Yerleştir / Yenile» düğmesine basın (yeni dosya adresi oluşturuldu)."
+        "İşlem tamamlandı. PDF bilgisayarınıza indirildi, depoya yüklendi ve rapor listesine eklendi.\n\nBir sonraki belge için karekodu yenilemek üzere «Karekodu Yerleştir / Yenile» düğmesine basın (yeni dosya adresi oluşturuldu)."
       );
 
       assignNewQrFileName();
