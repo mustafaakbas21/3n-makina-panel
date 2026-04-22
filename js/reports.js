@@ -63,6 +63,15 @@
 
   function fileTypeLabel(url) {
     if (!url) return "—";
+    var awFt = getAw();
+    var rawT = String(url).trim();
+    if (
+      awFt &&
+      typeof awFt.isValidStorageFileId === "function" &&
+      awFt.isValidStorageFileId(rawT)
+    ) {
+      return "PDF";
+    }
     var s = String(url).toLowerCase();
     if (
       s.indexOf("storage/buckets/") !== -1 &&
@@ -108,10 +117,37 @@
     return null;
   }
 
+  /**
+   * pdfUrl: tam Storage view/indir URL’si veya yalnızca dosya $id (Appwrite).
+   */
+  function storageRefsFromPdfUrl(pdfRaw) {
+    if (pdfRaw == null || String(pdfRaw).trim() === "") return null;
+    var s = String(pdfRaw).trim();
+    var aw = getAw();
+    if (
+      aw &&
+      typeof aw.isValidStorageFileId === "function" &&
+      aw.isValidStorageFileId(s) &&
+      aw.BUCKET_REPORTS
+    ) {
+      return { bucketId: String(aw.BUCKET_REPORTS), fileId: s };
+    }
+    var norm = normalizeReportPdfUrl(s);
+    return parseAppwriteStorageFileFromViewUrl(norm);
+  }
+
   /** Veritabanındaki eski hatalı kayıtlar (ör. .../files/unique()/view) — tıklanınca 400 verir */
   function isBrokenOrInvalidPdfUrl(url) {
     if (!url || typeof url !== "string") return true;
     var s = url.trim();
+    var awEarly = getAw();
+    if (
+      awEarly &&
+      typeof awEarly.isValidStorageFileId === "function" &&
+      awEarly.isValidStorageFileId(s)
+    ) {
+      return false;
+    }
     if (
       s.indexOf("/files/unique()/") !== -1 ||
       s.indexOf("/files/unique%28%29/") !== -1
@@ -232,6 +268,60 @@
       });
   }
 
+  function saveBlobAsDownload(blob, filename) {
+    var name =
+      filename && String(filename).trim()
+        ? String(filename).trim()
+        : "3N_Makina_Raporu.pdf";
+    var a = document.createElement("a");
+    var obj = URL.createObjectURL(blob);
+    a.href = obj;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    try {
+      URL.revokeObjectURL(obj);
+    } catch (revErr) {
+      /* — */
+    }
+  }
+
+  /**
+   * Rapor deposu: DB’deki bucket + dosya kimliği ile Appwrite Storage’dan binary çekip indirir.
+   */
+  function downloadReportFromStorage(bucketId, fileId, filename, fallbackViewUrl) {
+    var aw = getAw();
+    if (
+      !bucketId ||
+      !fileId ||
+      !aw ||
+      typeof aw.fetchStorageFileDownloadArrayBuffer !== "function"
+    ) {
+      if (fallbackViewUrl) {
+        triggerPdfDownload(fallbackViewUrl, filename);
+      }
+      return;
+    }
+    aw.fetchStorageFileDownloadArrayBuffer(bucketId, fileId)
+      .then(function (buf) {
+        saveBlobAsDownload(
+          new Blob([buf], { type: "application/pdf" }),
+          filename
+        );
+      })
+      .catch(function (err) {
+        console.warn("[3N] Storage indirme (SDK):", err);
+        if (fallbackViewUrl) {
+          triggerPdfDownload(fallbackViewUrl, filename);
+        } else {
+          window.alert(
+            "Dosya indirilemedi. Oturum veya Appwrite Storage izinlerini kontrol edin."
+          );
+        }
+      });
+  }
+
   function getSelectedCompanyId() {
     const sel = document.getElementById("reportCompanyFilter");
     return sel ? String(sel.value || "").trim() : "";
@@ -289,7 +379,6 @@
         const validityRaw = validityDateFromRow(row);
         const pdfUrl = rowVal(row, ["pdfUrl", "pdf_url"]);
         const id = row.id != null ? escapeHtml(String(row.id)) : "";
-        const urlAttr = pdfUrl ? escapeHtml(String(pdfUrl)) : "";
         const company = companyNameForReport(row);
         const fileType = fileTypeLabel(pdfUrl);
 
@@ -297,18 +386,35 @@
           !pdfUrl ||
           String(pdfUrl).trim() === "" ||
           isBrokenOrInvalidPdfUrl(String(pdfUrl));
-        const pdfNorm = pdfUrl ? normalizeReportPdfUrl(String(pdfUrl)) : "";
+        const awRow = getAw();
+        const stParts =
+          !downloadDisabled && pdfUrl
+            ? storageRefsFromPdfUrl(String(pdfUrl))
+            : null;
+        var viewHref = "";
+        if (
+          stParts &&
+          stParts.bucketId &&
+          stParts.fileId &&
+          awRow &&
+          typeof awRow.buildStorageFileViewUrl === "function"
+        ) {
+          viewHref = awRow.buildStorageFileViewUrl(
+            stParts.bucketId,
+            stParts.fileId
+          );
+        } else if (pdfUrl) {
+          viewHref = normalizeReportPdfUrl(String(pdfUrl));
+        }
+        const urlAttr = viewHref ? escapeHtml(String(viewHref)) : "";
         var storageDataAttrs = "";
-        if (!downloadDisabled && pdfNorm) {
-          var stParts = parseAppwriteStorageFileFromViewUrl(pdfNorm);
-          if (stParts && stParts.bucketId && stParts.fileId) {
-            storageDataAttrs =
-              " data-storage-bucket=\"" +
-              escapeHtml(stParts.bucketId) +
-              "\" data-storage-file=\"" +
-              escapeHtml(stParts.fileId) +
-              "\"";
-          }
+        if (stParts && stParts.bucketId && stParts.fileId) {
+          storageDataAttrs =
+            " data-storage-bucket=\"" +
+            escapeHtml(stParts.bucketId) +
+            "\" data-storage-file=\"" +
+            escapeHtml(stParts.fileId) +
+            "\"";
         }
         const downloadName = friendlyDownloadFilenameForRow(row);
         const downloadNameAttr = escapeHtml(downloadName);
@@ -347,7 +453,9 @@
               urlAttr +
               "\"" +
               storageDataAttrs +
-              " download=\"" +
+              " data-fallback-pdf=\"" +
+              urlAttr +
+              "\" download=\"" +
               downloadNameAttr +
               "\" rel=\"noopener noreferrer\">" +
               "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
@@ -613,6 +721,9 @@
     };
 
     try {
+      if (typeof aw.assertReportPdfUrlIsStorageLinkOnly === "function") {
+        aw.assertReportPdfUrlIsStorageLinkOnly(publicUrl);
+      }
       await aw.databases.createDocument(
         aw.DATABASE_ID,
         aw.COLLECTION_REPORTS,
@@ -857,56 +968,20 @@
 
       const btn = e.target.closest(".download-btn");
       if (!btn || btn.classList.contains("download-btn--disabled")) return;
-      const url = btn.getAttribute("href");
-      if (!url) return;
       e.preventDefault();
       const name =
         btn.getAttribute("download") || "3N_Makina_Raporu.pdf";
-      const aw = getAw();
       const bucket = btn.getAttribute("data-storage-bucket");
       const fileId = btn.getAttribute("data-storage-file");
-      if (
-        bucket &&
-        fileId &&
-        aw &&
-        aw.storage &&
-        typeof aw.storage.getFileDownload === "function"
-      ) {
-        var direct = "";
-        try {
-          direct = aw.storage.getFileDownload(bucket, fileId);
-        } catch (dlErr) {
-          console.warn("[3N] getFileDownload:", dlErr);
-        }
-        if (direct) {
-          var opened = false;
-          try {
-            var w = window.open(direct, "_blank", "noopener,noreferrer");
-            opened = !!(w && !w.closed);
-          } catch (popErr) {
-            opened = false;
-          }
-          if (!opened) {
-            var frame = document.createElement("iframe");
-            frame.setAttribute("hidden", "hidden");
-            frame.setAttribute("aria-hidden", "true");
-            frame.setAttribute("title", "PDF indirme");
-            frame.style.cssText =
-              "position:fixed;width:1px;height:1px;left:-99px;top:0;border:0;opacity:0;pointer-events:none;";
-            frame.src = direct;
-            document.body.appendChild(frame);
-            setTimeout(function () {
-              try {
-                document.body.removeChild(frame);
-              } catch (rmErr) {
-                /* — */
-              }
-            }, 180000);
-          }
-          return;
-        }
+      var fallback =
+        btn.getAttribute("data-fallback-pdf") || btn.getAttribute("href") || "";
+      if (bucket && fileId) {
+        downloadReportFromStorage(bucket, fileId, name, fallback.trim());
+        return;
       }
-      triggerPdfDownload(url, name);
+      if (fallback) {
+        triggerPdfDownload(fallback, name);
+      }
     });
   }
 

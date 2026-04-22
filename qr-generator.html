@@ -53,6 +53,56 @@
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
       background: #fff;
     }
+
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #report-container,
+      #report-container * {
+        visibility: visible;
+      }
+      #report-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 20mm;
+        box-shadow: none;
+      }
+    }
+
+    .qr-studio-loading__track {
+      width: 100%;
+      max-width: 280px;
+      height: 5px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .qr-studio-loading__track[hidden] {
+      display: none !important;
+    }
+    .qr-studio-loading__indeterminate {
+      height: 100%;
+      width: 42%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #2563eb, #60a5fa);
+      animation: qr-studio-loading-slide 1.05s ease-in-out infinite;
+    }
+    @keyframes qr-studio-loading-slide {
+      0% {
+        transform: translateX(-120%);
+      }
+      100% {
+        transform: translateX(320%);
+      }
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0/dist/iife/sdk.js"></script>
   <script>
@@ -146,8 +196,8 @@
         <div class="main__inner">
           <section class="panel qr-studio-panel">
             <p class="qr-studio__lead">
-              PDF veya Excel/Word yükleyin; önizleme yüksek çözünürlükte rasterlenir. Karekodu yerleştirdikten sonra köşelerden sürükleyerek <strong>orantılı</strong> büyütüp küçültebilirsiniz (çok küçültmeyin; telefonla okunabilirlik için yaklaşık 2–3 cm kenar önerilir).
-              «İşlemi Tamamla» ile tuvalde gördüğünüz düzen A4 PDF olarak kaydedilir, Appwrite depoya yüklenir ve karekod bu dosyanın kalıcı bağlantısını taşır.
+              PDF veya Excel/Word yükleyin; önizleme tuvalinde düzenleyin. Karekodu yerleştirdikten sonra köşelerden sürükleyerek <strong>orantılı</strong> büyütüp küçültebilirsiniz.
+              «İşlemi Tamamla» tuvali sıkıştırılmış PDF olarak Appwrite Storage’a yükler; rapor listesine yalnızca dosya bağlantısı kaydedilir (içerik veritabanına yazılmaz).
             </p>
 
             <div class="qr-studio-toolbar qr-studio-toolbar--grid">
@@ -209,6 +259,9 @@
             <div id="qrLoadingOverlay" class="qr-studio-loading" hidden aria-live="polite" aria-busy="true">
               <div class="qr-studio-loading__card">
                 <div class="qr-studio-spinner" aria-hidden="true"></div>
+                <div id="qrLoadingBarTrack" class="qr-studio-loading__track" hidden aria-hidden="true">
+                  <div class="qr-studio-loading__indeterminate"></div>
+                </div>
                 <p id="qrLoadingMessage" class="qr-studio-loading__text">Yükleniyor…</p>
               </div>
             </div>
@@ -276,7 +329,6 @@
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script defer src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script defer src="./js/qr-generator.js"></script>
 </body>

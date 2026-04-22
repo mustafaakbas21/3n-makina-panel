@@ -215,6 +215,32 @@ function isConfigured() {
 }
 
 /**
+ * Rapor belgesindeki pdfUrl yalnızca Appwrite Storage view/indir adresi (kısa string) olmalıdır.
+ * Base64 veya geçici blob: adresi veritabanına yazılmasın — depolama şişmesini önler.
+ */
+function assertReportPdfUrlIsStorageLinkOnly(url) {
+  var s = String(url == null ? "" : url).trim();
+  if (!s) {
+    throw new Error("pdfUrl boş; PDF Storage'a yüklendikten sonra adres gerekli.");
+  }
+  if (s.length > 6144) {
+    throw new Error(
+      "pdfUrl çok uzun — dosya içeriği veritabanına yazılamaz. Yalnızca Storage görüntüleme bağlantısı kullanın."
+    );
+  }
+  if (/^data:/i.test(s)) {
+    throw new Error(
+      "pdfUrl 'data:' ile başlayamaz (Base64). PDF yalnızca Storage'da tutulmalıdır."
+    );
+  }
+  if (/^blob:/i.test(s)) {
+    throw new Error(
+      "pdfUrl geçici blob: adresi olamaz; önce Storage'a yükleyin."
+    );
+  }
+}
+
+/**
  * Geçici «Failed to fetch» / HTTP2 / ağ kopması için birkaç deneme (Opera GX vb.).
  * @param {() => Promise<unknown>} fn
  * @param {{ attempts?: number, baseDelayMs?: number }} opts
@@ -279,6 +305,12 @@ window.__3nAppwrite = {
   parseStorageFileFromViewUrl: parseStorageFileFromViewUrl,
   storageFilePermissionsReadAny: storageFilePermissionsReadAny,
   withNetworkRetry: withNetworkRetry,
+  assertReportPdfUrlIsStorageLinkOnly: assertReportPdfUrlIsStorageLinkOnly,
 };
 
-export { generateFileId, newUniqueFileId, isValidStorageFileId };
+export {
+  generateFileId,
+  newUniqueFileId,
+  isValidStorageFileId,
+  assertReportPdfUrlIsStorageLinkOnly,
+};

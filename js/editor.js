@@ -1457,6 +1457,9 @@ async function saveReportAndUpload() {
     insertRow[REPORT_DB_COLUMNS.expiryDate] = expiryVal;
 
     try {
+      if (typeof aw.assertReportPdfUrlIsStorageLinkOnly === "function") {
+        aw.assertReportPdfUrlIsStorageLinkOnly(publicUrl);
+      }
       await aw.databases.createDocument(
         aw.DATABASE_ID,
         aw.COLLECTION_REPORTS,
