@@ -95,7 +95,7 @@ function normalizeDocuments(docs) {
  */
 function parseStorageFileFromViewUrl(url) {
   if (!url || typeof url !== "string") return null;
-  const m = String(url).trim().match(/\/storage\/buckets\/([^/]+)\/files\/([^/?#]+)/i);
+  const m = String(url).trim().match(/storage\/buckets\/([^/]+)\/files\/([^/?#]+)/i);
   if (!m) return null;
   var bid = m[1];
   var fid = m[2];

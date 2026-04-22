@@ -63,13 +63,37 @@
 
   function fileTypeLabel(url) {
     if (!url) return "—";
+    var s = String(url).toLowerCase();
+    if (
+      s.indexOf("storage/buckets/") !== -1 &&
+      (s.indexOf("/view") !== -1 || s.indexOf("/download") !== -1)
+    ) {
+      return "PDF";
+    }
     const u = String(url).split("?")[0];
-    const parts = u.split(".");
-    const ext = parts.length > 1 ? parts.pop().toLowerCase() : "";
+    const path = u.split(/[/\\]/).pop() || "";
+    const ext = path.indexOf(".") !== -1
+      ? path.slice(path.lastIndexOf(".") + 1).toLowerCase()
+      : "";
     if (ext === "pdf") return "PDF";
     if (ext === "doc" || ext === "docx") return "Word";
     if (ext === "xls" || ext === "xlsx") return "Excel";
     return ext ? ext.toUpperCase() : "—";
+  }
+
+  /** DB’de göreli veya eksik kök — parse için tam URL */
+  function normalizeReportPdfUrl(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return "";
+    if (/^https?:\/\//i.test(s)) return s;
+    if (s.startsWith("//")) return "https:" + s;
+    var aw = getAw();
+    if (aw && aw.client && aw.client.config && aw.client.config.endpoint) {
+      var ep = String(aw.client.config.endpoint || "").replace(/\/$/, "");
+      if (s.startsWith("/")) return ep + s;
+      return ep + "/" + s;
+    }
+    return s;
   }
 
   /**
@@ -94,7 +118,7 @@
     ) {
       return true;
     }
-    var m = s.match(/\/storage\/buckets\/[^/]+\/files\/([^/?#]+)/i);
+    var m = s.match(/storage\/buckets\/[^/]+\/files\/([^/?#]+)/i);
     if (!m) return false;
     var fid;
     try {
@@ -139,11 +163,12 @@
         : "3N_Makina_Raporu.pdf";
     var u = String(url || "").trim();
     if (!u) return;
+    var uNorm = normalizeReportPdfUrl(u);
 
     var aw = getAw();
     var parsed =
       aw && typeof aw.fetchStorageFileDownloadArrayBuffer === "function"
-        ? parseAppwriteStorageFileFromViewUrl(u)
+        ? parseAppwriteStorageFileFromViewUrl(uNorm)
         : null;
 
     function saveBlob(blob) {
@@ -169,7 +194,7 @@
         })
         .catch(function (err) {
           console.warn("[3N] PDF indirme (Appwrite):", err);
-          fetch(u, { mode: "cors", credentials: "include" })
+          fetch(uNorm, { mode: "cors", credentials: "include" })
             .then(function (res) {
               if (!res.ok) throw new Error("HTTP " + res.status);
               return res.blob();
@@ -177,7 +202,7 @@
             .then(saveBlob)
             .catch(function () {
               var a = document.createElement("a");
-              a.href = u;
+              a.href = uNorm;
               a.download = name;
               a.target = "_blank";
               a.rel = "noopener noreferrer";
@@ -189,7 +214,7 @@
       return;
     }
 
-    fetch(u, { mode: "cors", credentials: "include" })
+    fetch(uNorm, { mode: "cors", credentials: "include" })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.blob();
@@ -197,7 +222,7 @@
       .then(saveBlob)
       .catch(function () {
         var a = document.createElement("a");
-        a.href = u;
+        a.href = uNorm;
         a.download = name;
         a.target = "_blank";
         a.rel = "noopener noreferrer";
@@ -272,6 +297,19 @@
           !pdfUrl ||
           String(pdfUrl).trim() === "" ||
           isBrokenOrInvalidPdfUrl(String(pdfUrl));
+        const pdfNorm = pdfUrl ? normalizeReportPdfUrl(String(pdfUrl)) : "";
+        var storageDataAttrs = "";
+        if (!downloadDisabled && pdfNorm) {
+          var stParts = parseAppwriteStorageFileFromViewUrl(pdfNorm);
+          if (stParts && stParts.bucketId && stParts.fileId) {
+            storageDataAttrs =
+              " data-storage-bucket=\"" +
+              escapeHtml(stParts.bucketId) +
+              "\" data-storage-file=\"" +
+              escapeHtml(stParts.fileId) +
+              "\"";
+          }
+        }
         const downloadName = friendlyDownloadFilenameForRow(row);
         const downloadNameAttr = escapeHtml(downloadName);
         const brokenTitle =
@@ -307,7 +345,9 @@
               "</span>"
             : "<a class=\"download-btn\" href=\"" +
               urlAttr +
-              "\" download=\"" +
+              "\"" +
+              storageDataAttrs +
+              " download=\"" +
               downloadNameAttr +
               "\" rel=\"noopener noreferrer\">" +
               "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
@@ -736,7 +776,9 @@
       applyFiltersAndRender();
 
       if (pdfUrl && aw.storage) {
-        const parsed = parseAppwriteStorageFileFromViewUrl(String(pdfUrl));
+        const parsed = parseAppwriteStorageFileFromViewUrl(
+          normalizeReportPdfUrl(String(pdfUrl))
+        );
         if (parsed) {
           try {
             await aw.storage.deleteFile(parsed.bucketId, parsed.fileId);
@@ -781,6 +823,50 @@
       e.preventDefault();
       const name =
         btn.getAttribute("download") || "3N_Makina_Raporu.pdf";
+      const aw = getAw();
+      const bucket = btn.getAttribute("data-storage-bucket");
+      const fileId = btn.getAttribute("data-storage-file");
+      if (
+        bucket &&
+        fileId &&
+        aw &&
+        aw.storage &&
+        typeof aw.storage.getFileDownload === "function"
+      ) {
+        var direct = "";
+        try {
+          direct = aw.storage.getFileDownload(bucket, fileId);
+        } catch (dlErr) {
+          console.warn("[3N] getFileDownload:", dlErr);
+        }
+        if (direct) {
+          var opened = false;
+          try {
+            var w = window.open(direct, "_blank", "noopener,noreferrer");
+            opened = !!(w && !w.closed);
+          } catch (popErr) {
+            opened = false;
+          }
+          if (!opened) {
+            var frame = document.createElement("iframe");
+            frame.setAttribute("hidden", "hidden");
+            frame.setAttribute("aria-hidden", "true");
+            frame.setAttribute("title", "PDF indirme");
+            frame.style.cssText =
+              "position:fixed;width:1px;height:1px;left:-99px;top:0;border:0;opacity:0;pointer-events:none;";
+            frame.src = direct;
+            document.body.appendChild(frame);
+            setTimeout(function () {
+              try {
+                document.body.removeChild(frame);
+              } catch (rmErr) {
+                /* — */
+              }
+            }, 180000);
+          }
+          return;
+        }
+      }
       triggerPdfDownload(url, name);
     });
   }

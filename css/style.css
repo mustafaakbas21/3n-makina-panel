@@ -612,6 +612,8 @@ a.sidebar__logout {
 
 .main__inner {
   padding-bottom: 1.5rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* —— Dashboard: sol (istatistik + tablo) / sağ (takvim + yaklaşan) —— */
@@ -1460,6 +1462,8 @@ a.sidebar__logout {
 /* —— Rapor Deposu (reports.html) —— */
 .reports-repo-panel {
   padding: 1.35rem 1.5rem 1.5rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .drop-zone {
@@ -1592,6 +1596,30 @@ a.sidebar__logout {
 
 .reports-table-wrap {
   margin-top: 0;
+  overflow-x: hidden;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.reports-table-wrap .data-table--reports {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.reports-table-wrap .data-table--reports th,
+.reports-table-wrap .data-table--reports td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reports-table-wrap .data-table--reports th.data-table__actions,
+.reports-table-wrap .data-table--reports td.data-table__actions {
+  overflow: visible;
+  white-space: normal;
+  width: 1%;
+  max-width: none;
+  text-overflow: clip;
 }
 
 .data-table--reports .download-btn {
