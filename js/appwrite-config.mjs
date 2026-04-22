@@ -70,12 +70,15 @@ function newUniqueFileId() {
 }
 
 /**
- * Appwrite Console → Ayarlar → API Endpoint ile birebir aynı hostname kullanın.
- * Frankfurt (EU) projelerinde genelde https://fra.cloud.appwrite.io/v1 olur.
- * cloud.appwrite.io ile fra.cloud.appwrite.io karıştırılırsa Storage istekleri 404 döner.
+ * Tek kaynak API kökü (sonunda / olmalı). QR ve Storage view/indir URL’leri buradan üretilir.
+ * SDK Client varsayılanı cloud.appwrite.io olabildiği için kamusal linklerde client.config yerine
+ * daima bu sabit kullanılır; aksi halde QR’da yanlış host → storage_file_not_found.
+ * Konsoldaki bölgenizle aynı olmalı (örn. Frankfurt: https://fra.cloud.appwrite.io/v1).
  */
+const APPWRITE_API_BASE = "https://fra.cloud.appwrite.io/v1";
+
 const client = new Client()
-  .setEndpoint("https://fra.cloud.appwrite.io/v1")
+  .setEndpoint(APPWRITE_API_BASE)
   .setProject("69dcde32001b4de0d04e");
 
 const account = new Account(client);
@@ -141,7 +144,7 @@ function buildStorageFileViewUrl(bucketId, fileId) {
   if (!isValidStorageFileId(fileId)) {
     return "";
   }
-  var ep = String(client.config.endpoint || "").replace(/\/$/, "");
+  var ep = String(APPWRITE_API_BASE || "").replace(/\/$/, "");
   var pid = String(client.config.project || "");
   var b = encodeURIComponent(String(bucketId));
   var f = encodeURIComponent(String(fileId));
@@ -170,7 +173,7 @@ function buildStorageFileDownloadUrl(bucketId, fileId) {
   try {
     return storage.getFileDownload(bucketId, fileId);
   } catch (e) {
-    var ep = String(client.config.endpoint || "").replace(/\/$/, "");
+    var ep = String(APPWRITE_API_BASE || "").replace(/\/$/, "");
     var pid = String(client.config.project || "");
     var b = encodeURIComponent(String(bucketId));
     var f = encodeURIComponent(String(fileId));
@@ -184,6 +187,35 @@ function buildStorageFileDownloadUrl(bucketId, fileId) {
       encodeURIComponent(pid)
     );
   }
+}
+
+/**
+ * Eski kayıtlar / QR metni yanlışlıkla cloud.appwrite.io içeriyorsa, dosya FRA vb. bölgedeyse 404 olur.
+ * Yapılandırılmış API host’una host düzeltmesi (yol ve sorgu aynı kalır).
+ */
+function normalizeLegacyAppwriteStorageUrl(url) {
+  var s = String(url == null ? "" : url).trim();
+  if (!s) return s;
+  var baseHost = "";
+  try {
+    baseHost = new URL(
+      APPWRITE_API_BASE.endsWith("/") ? APPWRITE_API_BASE : APPWRITE_API_BASE + "/"
+    ).hostname;
+  } catch (e0) {
+    return s;
+  }
+  if (!baseHost || baseHost === "cloud.appwrite.io") return s;
+  try {
+    var u = new URL(s);
+    if (u.hostname === "cloud.appwrite.io") {
+      u.hostname = baseHost;
+      u.protocol = "https:";
+      return u.toString();
+    }
+  } catch (e1) {
+    return s;
+  }
+  return s;
 }
 
 function extractFileIdFromStorageUploadResponse(uploadResult) {
@@ -315,10 +347,11 @@ window.__3nAppwrite = {
   account: account,
   databases: databases,
   storage: storage,
-  /** QR / rapor hata ayıklama: tarayıcı konsolunda beklenen API host’unu doğrulayın */
+  /** QR / rapor hata ayıklama: kamusal Storage URL’leri ile aynı kök */
   getApiEndpoint: function () {
-    return String((client.config && client.config.endpoint) || "");
+    return String(APPWRITE_API_BASE || "").replace(/\/$/, "");
   },
+  normalizeLegacyAppwriteStorageUrl: normalizeLegacyAppwriteStorageUrl,
   getStorageBucketId: function () {
     return String(BUCKET_ID || "");
   },
@@ -350,12 +383,7 @@ window.__3nAppwrite = {
 };
 
 try {
-  console.info(
-    "[3N Appwrite] API:",
-    client.config.endpoint,
-    "| bucket:",
-    BUCKET_ID
-  );
+  console.info("[3N Appwrite] API:", APPWRITE_API_BASE, "| bucket:", BUCKET_ID);
 } catch (logErr) {
   /* — */
 }

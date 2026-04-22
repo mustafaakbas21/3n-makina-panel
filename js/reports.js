@@ -90,17 +90,27 @@
     return ext ? ext.toUpperCase() : "—";
   }
 
-  /** DB’de göreli veya eksik kök — parse için tam URL */
+  /** DB’de göreli veya eksik kök — parse için tam URL; cloud.appwrite.io → yapılandırılmış bölge */
   function normalizeReportPdfUrl(raw) {
     var s = String(raw || "").trim();
     if (!s) return "";
-    if (/^https?:\/\//i.test(s)) return s;
-    if (s.startsWith("//")) return "https:" + s;
     var aw = getAw();
+    function fixHost(u) {
+      if (aw && typeof aw.normalizeLegacyAppwriteStorageUrl === "function") {
+        return aw.normalizeLegacyAppwriteStorageUrl(u);
+      }
+      return u;
+    }
+    if (/^https?:\/\//i.test(s)) {
+      return fixHost(s);
+    }
+    if (s.startsWith("//")) {
+      return fixHost("https:" + s);
+    }
     if (aw && aw.client && aw.client.config && aw.client.config.endpoint) {
       var ep = String(aw.client.config.endpoint || "").replace(/\/$/, "");
-      if (s.startsWith("/")) return ep + s;
-      return ep + "/" + s;
+      var built = s.startsWith("/") ? ep + s : ep + "/" + s;
+      return fixHost(built);
     }
     return s;
   }
