@@ -69,7 +69,11 @@ function newUniqueFileId() {
   return generateFileId();
 }
 
-/** Appwrite Console → Settings → General → Project ID ile aynı olmalı (yanlış ID → Failed to fetch / 404). */
+/**
+ * Appwrite Console → Ayarlar → API Endpoint ile birebir aynı hostname kullanın.
+ * Frankfurt (EU) projelerinde genelde https://fra.cloud.appwrite.io/v1 olur.
+ * cloud.appwrite.io ile fra.cloud.appwrite.io karıştırılırsa Storage istekleri 404 döner.
+ */
 const client = new Client()
   .setEndpoint("https://fra.cloud.appwrite.io/v1")
   .setProject("69dcde32001b4de0d04e");
@@ -308,6 +312,10 @@ window.__3nAppwrite = {
   account: account,
   databases: databases,
   storage: storage,
+  /** QR / rapor hata ayıklama: tarayıcı konsolunda beklenen API host’unu doğrulayın */
+  getApiEndpoint: function () {
+    return String((client.config && client.config.endpoint) || "");
+  },
   Query: Query,
   generateFileId: generateFileId,
   newUniqueFileId: newUniqueFileId,
@@ -334,6 +342,17 @@ window.__3nAppwrite = {
   withNetworkRetry: withNetworkRetry,
   assertReportPdfUrlIsStorageLinkOnly: assertReportPdfUrlIsStorageLinkOnly,
 };
+
+try {
+  console.info(
+    "[3N Appwrite] API:",
+    client.config.endpoint,
+    "| bucket:",
+    BUCKET_ID
+  );
+} catch (logErr) {
+  /* — */
+}
 
 export {
   generateFileId,

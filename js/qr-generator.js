@@ -11,6 +11,29 @@
       : null;
   }
 
+  /** AppwriteException.code = HTTP durumu */
+  function describeQrWorkflowError(err, aw) {
+    var msg = err && err.message ? String(err.message) : String(err);
+    var code =
+      err && typeof err.code === "number" && !Number.isNaN(err.code)
+        ? err.code
+        : 0;
+    var extra = "";
+    if (code === 404) {
+      extra =
+        "\n\nStorage 404: Appwrite Konsolu → Ayarlar’daki «API Endpoint» adresi js/appwrite-config.mjs içindeki setEndpoint ile aynı olmalı (örn. Frankfurt: https://fra.cloud.appwrite.io/v1). Yanlış bölge veya bucket $id bu hatayı verir. Ayrıca Konsolda ağ sekmesinde isteğin hangi host’a gittiğini kontrol edin.";
+    } else if (code === 403) {
+      extra =
+        "\n\n403: Bu sitenin alan adı (örn. mustafaakbas21.github.io) Appwrite → Auth → Platforms → Web altında kayıtlı olmalı.";
+    }
+    var ep =
+      aw && typeof aw.getApiEndpoint === "function" ? aw.getApiEndpoint() : "";
+    if (ep) {
+      extra += "\n\nYapılandırılmış API: " + ep;
+    }
+    return msg + extra;
+  }
+
   const PDF_JS_VER = "3.11.174";
   /** A4 ~96dpi iç genişliği; PDF/html2canvas ile aynı hizada tutulur (yan boşluk / sıkışma önlenir) */
   const A4_CONTENT_CSS_PX = 794;
@@ -19,8 +42,38 @@
   /** PDF.js: sayfa raster’ı en az bu kadar geniş (net önizleme + PDF için) */
   const PDF_MIN_RASTER_WIDTH = 1280;
   const PDF_MAX_RASTER_WIDTH = 2000;
-  /** html2canvas (Word/Excel HTML → görüntü) */
-  const SNAPSHOT_HTML_SCALE = 2.25;
+  /**
+   * Word/Excel → html2canvas (nihai PDF yine jsPDF).
+   * scale 4 + 1200px çok yavaş / şişkin blob; 3 + 1000px tablolar için hâlâ net, süre ve MB daha iyi.
+   */
+  const HTML2PDF_OPT = {
+    margin: [10, 0, 10, 0],
+    filename: "3N_Makina_Raporu.pdf",
+    image: { type: "jpeg", quality: 0.88 },
+    html2canvas: {
+      scale: 3,
+      useCORS: true,
+      scrollY: 0,
+      windowWidth: 1000,
+      letterRendering: true,
+    },
+    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+  };
+  const SNAPSHOT_INNER_WIDTH_PX = HTML2PDF_OPT.html2canvas.windowWidth;
+  /** pdf.js sayfa raster’ı → JPEG (önizleme + çok sayfalı PDF; MB için PNG’den iyi) */
+  const PDF_PAGE_JPEG_QUALITY = 0.85;
+  /** Fabric → tek sayfalık PDF: html2canvas ile aynı kalite, çarpan 2’den düşük = daha hızlı/küçük */
+  const FABRIC_PDF_JPEG_QUALITY = HTML2PDF_OPT.image.quality;
+  const FABRIC_PDF_MULTIPLIER = 1.75;
+
+  function canvasToJpegDataUrl(canvas, quality) {
+    var q =
+      typeof quality === "number"
+        ? quality
+        : HTML2PDF_OPT.image.quality;
+    q = Math.min(1, Math.max(0.5, q));
+    return canvas.toDataURL("image/jpeg", q);
+  }
   /** QR kaynak görüntüsü (küçültülünce/büyütülünce okunabilir kalsın) */
   const QR_SOURCE_SIZE = 480;
 
@@ -188,7 +241,7 @@
         tmp.height = Math.floor(viewport.height);
         await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-        const dataUrl = tmp.toDataURL("image/png");
+        const dataUrl = canvasToJpegDataUrl(tmp, PDF_PAGE_JPEG_QUALITY);
         var isQrPage = (qrOverlayPdfPage > 0 && i === qrOverlayPdfPage);
         pagesData.push({
           pageNum: i,
@@ -239,7 +292,7 @@
         unit: "pt",
         format: "a4",
         orientation: "portrait",
-        compress: false,
+        compress: true,
         precision: 16,
       });
 
@@ -262,7 +315,7 @@
               var offsetX = (A4_WIDTH - drawW) / 2;
               var offsetY = (A4_HEIGHT - drawH) / 2;
 
-              doc.addImage(pg.dataUrl, "PNG", offsetX, offsetY, drawW, drawH);
+              doc.addImage(pg.dataUrl, "JPEG", offsetX, offsetY, drawW, drawH);
 
               if (pg.isQrPage && lastQrDataUrl && qrFabricImage) {
                 var scale = A4_WIDTH / 794;
@@ -284,9 +337,9 @@
 
       if (!useMultiPage) {
         var canvasDataUrl = fabricCanvas.toDataURL({
-          format: "png",
-          quality: 1,
-          multiplier: 1
+          format: "jpeg",
+          quality: FABRIC_PDF_JPEG_QUALITY,
+          multiplier: FABRIC_PDF_MULTIPLIER,
         });
 
         var canvasWidth = fabricCanvas.width;
@@ -297,7 +350,7 @@
         var offsetX = (A4_WIDTH - drawW) / 2;
         var offsetY = (A4_HEIGHT - drawH) / 2;
 
-        doc.addImage(canvasDataUrl, "PNG", offsetX, offsetY, drawW, drawH);
+        doc.addImage(canvasDataUrl, "JPEG", offsetX, offsetY, drawW, drawH);
       }
 
       var pdfBlob = doc.output("blob");
@@ -393,7 +446,7 @@
       tmp.height = Math.floor(viewport.height);
       await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-      const bgDataUrl = tmp.toDataURL("image/png");
+      const bgDataUrl = canvasToJpegDataUrl(tmp, PDF_PAGE_JPEG_QUALITY);
       await openImageDataUrlAsFabricBackground(
         bgDataUrl,
         viewport.width,
@@ -568,7 +621,7 @@
     root.innerHTML =
       '<div class="qr-studio-snapshot-inner">' + result.value + "</div>";
     const inner = root.querySelector(".qr-studio-snapshot-inner");
-    inner.style.width = A4_CONTENT_CSS_PX + "px";
+    inner.style.width = SNAPSHOT_INNER_WIDTH_PX + "px";
     inner.style.padding = "28px";
     inner.style.boxSizing = "border-box";
     inner.style.background = "#ffffff";
@@ -582,14 +635,13 @@
       throw new Error("html2canvas yüklenemedi.");
     }
 
-    const canvas = await html2canvas(inner, {
-      scale: SNAPSHOT_HTML_SCALE,
-      useCORS: true,
-      logging: false,
-      backgroundColor: "#ffffff",
-      windowWidth: A4_CONTENT_CSS_PX,
-      letterRendering: true,
-    });
+    const canvas = await html2canvas(inner, Object.assign(
+      {
+        logging: false,
+        backgroundColor: "#ffffff",
+      },
+      HTML2PDF_OPT.html2canvas
+    ));
     root.innerHTML = "";
     return canvas;
   }
@@ -644,7 +696,7 @@
       html +
       "</div>";
     const inner = root.querySelector(".qr-studio-snapshot-inner");
-    inner.style.width = A4_CONTENT_CSS_PX + "px";
+    inner.style.width = SNAPSHOT_INNER_WIDTH_PX + "px";
     inner.style.padding = "24px";
     inner.style.boxSizing = "border-box";
     inner.style.background = "#ffffff";
@@ -657,14 +709,13 @@
       throw new Error("html2canvas yüklenemedi.");
     }
 
-    const canvas = await html2canvas(inner, {
-      scale: SNAPSHOT_HTML_SCALE,
-      useCORS: true,
-      logging: false,
-      backgroundColor: "#ffffff",
-      windowWidth: A4_CONTENT_CSS_PX,
-      letterRendering: true,
-    });
+    const canvas = await html2canvas(inner, Object.assign(
+      {
+        logging: false,
+        backgroundColor: "#ffffff",
+      },
+      HTML2PDF_OPT.html2canvas
+    ));
     root.innerHTML = "";
     return canvas;
   }
@@ -688,7 +739,7 @@
       if (ext === "docx") {
         setLoading(true, "Word belgesi görüntüye dönüştürülüyor…");
         const snap = await snapshotDocxToCanvas(buf);
-        const dataUrl = snap.toDataURL("image/png");
+        const dataUrl = canvasToJpegDataUrl(snap, HTML2PDF_OPT.image.quality);
         await openImageDataUrlAsFabricBackground(dataUrl, snap.width, snap.height);
         setLoading(false);
         return;
@@ -697,7 +748,7 @@
       if (ext === "xls" || ext === "xlsx") {
         setLoading(true, "Excel tablosu görüntüye dönüştürülüyor…");
         const snap = await snapshotExcelToCanvas(buf);
-        const dataUrl = snap.toDataURL("image/png");
+        const dataUrl = canvasToJpegDataUrl(snap, HTML2PDF_OPT.image.quality);
         await openImageDataUrlAsFabricBackground(dataUrl, snap.width, snap.height);
         setLoading(false);
         return;
@@ -1078,8 +1129,8 @@
     } catch (error) {
       console.error("APPWRITE DETAYLI HATA:", error);
       window.alert(
-        (error && error.message ? error.message : String(error)) +
-          "\n\nPDF oluşturma, yükleme veya veritabanı kaydı başarısız. Ağ ve Appwrite izinlerini kontrol edin."
+        describeQrWorkflowError(error, getAw()) +
+          "\n\nPDF oluşturma, yükleme veya veritabanı kaydı başarısız olabilir; yukarıdaki ipuçlarına bakın."
       );
     } finally {
       setLoading(false);
