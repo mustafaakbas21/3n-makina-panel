@@ -54,6 +54,26 @@
       background: #fff;
     }
 
+    /* html2pdf: gerçek A4 genişliği; ekran genişliğine göre sıkışmayı azaltır */
+    #report-container {
+      width: 210mm;
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 10mm 15mm;
+      box-sizing: border-box;
+      background: #fff;
+      overflow: visible;
+    }
+    #report-container table,
+    #report-container tr,
+    #report-container td,
+    #report-container .qr-wrapper,
+    #report-container .qr-wrapper canvas,
+    #report-container img {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
     @page {
       size: A4 portrait;
       margin: 0;
@@ -70,9 +90,11 @@
         position: absolute;
         left: 0;
         top: 0;
-        width: 100%;
+        width: 210mm;
+        max-width: 100%;
         margin: 0;
-        padding: 20mm;
+        padding: 10mm 15mm;
+        box-sizing: border-box;
         box-shadow: none;
       }
     }
@@ -302,7 +324,7 @@
                 </p>
               </div>
               <div id="report-container" class="qr-report-container">
-                <div class="qr-studio-canvas-wrap">
+                <div class="qr-studio-canvas-wrap qr-wrapper">
                   <canvas id="pdfCanvas" width="800" height="1000" aria-label="Belge önizlemesi ve karekod"></canvas>
                 </div>
               </div>

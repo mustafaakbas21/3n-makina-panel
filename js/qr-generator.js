@@ -174,22 +174,24 @@
       }
 
       var opt = {
-        margin: 10,
+        margin: [10, 0, 10, 0],
         filename: fname,
-        image: { type: "jpeg", quality: 0.8 },
+        image: { type: "jpeg", quality: 1.0 },
         html2canvas: {
           scale: 2,
           useCORS: true,
+          letterRendering: true,
           logging: false,
           backgroundColor: "#ffffff",
+          windowWidth: 794,
         },
         jsPDF: {
-          compress: true,
-          orientation: "portrait",
-          format: "a4",
           unit: "mm",
+          format: "a4",
+          orientation: "portrait",
+          compress: true,
         },
-        pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+        pagebreak: { mode: ["css", "legacy"] },
       };
 
       requestAnimationFrame(function () {
