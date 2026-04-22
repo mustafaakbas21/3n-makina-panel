@@ -174,7 +174,7 @@
         if (baseVp.width * rasterScale < PDF_MIN_RASTER_WIDTH) {
           rasterScale = PDF_MIN_RASTER_WIDTH / baseVp.width;
         }
-        rasterScale = Math.min(rasterScale, 2.0);
+        rasterScale = Math.min(rasterScale, 3.0);
         const viewport = page.getViewport({ scale: rasterScale });
 
         const tmp = document.createElement("canvas");
@@ -239,7 +239,8 @@
         unit: "pt",
         format: "a4",
         orientation: "portrait",
-        compress: true,
+        compress: false,
+        precision: 16,
       });
 
       const A4_WIDTH = 595.28;
