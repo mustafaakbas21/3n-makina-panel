@@ -1456,11 +1456,12 @@ async function saveReportAndUpload() {
     insertRow[REPORT_DB_COLUMNS.pdfUrl] = publicUrl;
     insertRow[REPORT_DB_COLUMNS.expiryDate] = expiryVal;
 
+    var createdReportDoc = null;
     try {
       if (typeof aw.assertReportPdfUrlIsStorageLinkOnly === "function") {
         aw.assertReportPdfUrlIsStorageLinkOnly(publicUrl);
       }
-      await aw.databases.createDocument(
+      createdReportDoc = await aw.databases.createDocument(
         aw.DATABASE_ID,
         aw.COLLECTION_REPORTS,
         aw.newUniqueFileId(),
@@ -1477,13 +1478,21 @@ async function saveReportAndUpload() {
       return;
     }
 
-    // 5) Ana sayfa takvimi: ilk rapor + hatırlatıcı tarihleri (localStorage)
+    // 5) Ana sayfa takvimi: ilk rapor + hatırlatıcı tarihleri (localStorage; rapor $id ile depo eşlemesi)
     const calDates = getReportCalendarDateValues();
+    var newReportId =
+      createdReportDoc &&
+      (createdReportDoc.$id != null
+        ? String(createdReportDoc.$id)
+        : createdReportDoc.id != null
+          ? String(createdReportDoc.id)
+          : "");
     if (typeof window.__3nSaveReportCalendarMarkers === "function") {
       window.__3nSaveReportCalendarMarkers({
         firstDate: calDates.firstDate,
         reminderDate: calDates.reminderDate,
         title: reportTitle,
+        reportId: newReportId,
       });
     }
 

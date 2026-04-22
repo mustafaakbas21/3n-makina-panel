@@ -12,8 +12,10 @@
   }
 
   const PDF_JS_VER = "3.11.174";
+  /** A4 ~96dpi iç genişliği; PDF/html2canvas ile aynı hizada tutulur (yan boşluk / sıkışma önlenir) */
+  const A4_CONTENT_CSS_PX = 794;
   /** Ekranda gösterilen tuval genişliği (CSS piksel) */
-  const MAX_CANVAS_WIDTH = 920;
+  const MAX_CANVAS_WIDTH = A4_CONTENT_CSS_PX;
   /** PDF.js: sayfa raster’ı en az bu kadar geniş (net önizleme + PDF için) */
   const PDF_MIN_RASTER_WIDTH = 1280;
   const PDF_MAX_RASTER_WIDTH = 2000;
@@ -165,6 +167,12 @@
         }
       }
 
+      var captureW = Math.max(
+        A4_CONTENT_CSS_PX,
+        Math.ceil(el.scrollWidth || 0),
+        Math.ceil(el.offsetWidth || 0)
+      );
+
       var fname =
         displayFilename && String(displayFilename).trim()
           ? String(displayFilename).trim()
@@ -174,16 +182,18 @@
       }
 
       var opt = {
-        margin: [10, 0, 10, 0],
+        margin: [0, 0, 0, 0],
         filename: fname,
-        image: { type: "jpeg", quality: 1.0 },
+        image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
-          scale: 2,
+          scale: 1.75,
           useCORS: true,
           letterRendering: true,
           logging: false,
           backgroundColor: "#ffffff",
-          windowWidth: 794,
+          windowWidth: captureW,
+          scrollX: 0,
+          scrollY: 0,
         },
         jsPDF: {
           unit: "mm",
@@ -191,7 +201,7 @@
           orientation: "portrait",
           compress: true,
         },
-        pagebreak: { mode: ["css", "legacy"] },
+        pagebreak: { mode: ["legacy"] },
       };
 
       requestAnimationFrame(function () {
@@ -481,7 +491,7 @@
     root.innerHTML =
       '<div class="qr-studio-snapshot-inner">' + result.value + "</div>";
     const inner = root.querySelector(".qr-studio-snapshot-inner");
-    inner.style.width = "900px";
+    inner.style.width = A4_CONTENT_CSS_PX + "px";
     inner.style.padding = "28px";
     inner.style.boxSizing = "border-box";
     inner.style.background = "#ffffff";
@@ -500,6 +510,7 @@
       useCORS: true,
       logging: false,
       backgroundColor: "#ffffff",
+      windowWidth: A4_CONTENT_CSS_PX,
       letterRendering: true,
     });
     root.innerHTML = "";
@@ -556,7 +567,7 @@
       html +
       "</div>";
     const inner = root.querySelector(".qr-studio-snapshot-inner");
-    inner.style.width = "1100px";
+    inner.style.width = A4_CONTENT_CSS_PX + "px";
     inner.style.padding = "24px";
     inner.style.boxSizing = "border-box";
     inner.style.background = "#ffffff";
@@ -574,7 +585,7 @@
       useCORS: true,
       logging: false,
       backgroundColor: "#ffffff",
-      windowWidth: 1100,
+      windowWidth: A4_CONTENT_CSS_PX,
       letterRendering: true,
     });
     root.innerHTML = "";
@@ -930,13 +941,14 @@
               );
             }
 
+            var createdQrReportDoc = null;
             if (typeof aw.withNetworkRetry === "function") {
-              await aw.withNetworkRetry(runCreate, {
+              createdQrReportDoc = await aw.withNetworkRetry(runCreate, {
                 attempts: 4,
                 baseDelayMs: 450,
               });
             } else {
-              await runCreate();
+              createdQrReportDoc = await runCreate();
             }
 
             const calDates = getQrCalendarDateValues();
@@ -944,11 +956,19 @@
               titleEl && titleEl.value && titleEl.value.trim()
                 ? titleEl.value.trim()
                 : "QR Stüdyosu";
+            var newQrReportId =
+              createdQrReportDoc &&
+              (createdQrReportDoc.$id != null
+                ? String(createdQrReportDoc.$id)
+                : createdQrReportDoc.id != null
+                  ? String(createdQrReportDoc.id)
+                  : "");
             if (typeof window.__3nSaveReportCalendarMarkers === "function") {
               window.__3nSaveReportCalendarMarkers({
                 firstDate: calDates.firstDate,
                 reminderDate: calDates.reminderDate,
                 title: calTitle,
+                reportId: newQrReportId,
               });
             }
 

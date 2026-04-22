@@ -196,14 +196,10 @@
                   <span class="calendar-legend__item"><span class="calendar-legend__swatch calendar-legend__swatch--reminder" aria-hidden="true"></span> Son hatırlatıcı</span>
                   <span class="calendar-legend__item"><span class="calendar-legend__swatch calendar-legend__swatch--expiry" aria-hidden="true"></span> Geçerlilik bitişi</span>
                 </p>
-                <details class="calendar-markers-accordion" id="calendarMarkersAccordion">
-                  <summary class="calendar-markers-accordion__summary">
-                    <span class="calendar-markers-accordion__summary-main">Hangi rapor?</span>
-                    <span class="calendar-markers-accordion__count" id="calendarMarkersAccordionCount" aria-hidden="true"></span>
-                    <i class="fa-solid fa-chevron-down calendar-markers-accordion__chev" aria-hidden="true"></i>
-                  </summary>
-                  <div class="calendar-markers-accordion__body" id="calendarMarkersAccordionBody"></div>
-                </details>
+                <p class="calendar-markers-by-date__hint">
+                  <strong>İlk rapor</strong> tarihine göre gruplandı; aynı gündeki kayıtlar tek satırda, rapor adları tarihin altında listelenir.
+                </p>
+                <div class="calendar-markers-by-date" id="calendarMarkersByDateRoot" aria-label="İlk rapor tarihine göre raporlar"></div>
               </section>
 
               <section class="widget upcoming-widget" aria-labelledby="upcomingWidgetTitle">

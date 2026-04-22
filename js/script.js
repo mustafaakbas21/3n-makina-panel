@@ -499,14 +499,88 @@ function getReportCalendarMarkers() {
   }
 }
 
+/**
+ * Depoda olmayan işaretleri localStorage’dan düşürür (Rapor Deposu ile uyum).
+ * @param {Array<{ id?: string }>} rows normalizeDocuments çıktısı
+ */
+function pruneReportCalendarMarkersToExistingRows(rows) {
+  try {
+    const ids = new Set();
+    (rows || []).forEach(function (r) {
+      if (r && r.id != null) ids.add(String(r.id));
+    });
+    const all = getReportCalendarMarkers();
+    const next = all.filter(function (m) {
+      const rid = m.reportId != null ? String(m.reportId).trim() : "";
+      return rid && ids.has(rid);
+    });
+    if (next.length === all.length) return;
+    localStorage.setItem(
+      CALENDAR_MARKERS_STORAGE_KEY,
+      JSON.stringify({ items: next })
+    );
+  } catch (e) {
+    /* — */
+  }
+}
+
+/** Rapor Deposu listesi yüklendiğinde / ana sayfa verisi sonrası */
+window.__3nPruneReportCalendarMarkersToReportRows = pruneReportCalendarMarkersToExistingRows;
+
+/** Rapor silindiğinde aynı oturumda takvim yerel kaydını günceller */
+window.__3nRemoveReportCalendarMarkerByReportId = function (documentId) {
+  if (documentId == null || documentId === "") return;
+  const id = String(documentId);
+  try {
+    const all = getReportCalendarMarkers();
+    const next = all.filter(function (m) {
+      return String(m.reportId || "") !== id;
+    });
+    if (next.length === all.length) return;
+    localStorage.setItem(
+      CALENDAR_MARKERS_STORAGE_KEY,
+      JSON.stringify({ items: next })
+    );
+  } catch (e) {
+    return;
+  }
+  if (document.getElementById("calendarGrid")) {
+    renderCalendar();
+  }
+};
+
+/** Takvim + gruplu liste: depo listesi alınamadıysa eski davranış; alındıysa yalnızca reportId’si depoda olanlar */
+function getReportCalendarMarkersForCalendarUi() {
+  const items = getReportCalendarMarkers();
+  if (!dashboardReportsFetchSucceeded) {
+    return items;
+  }
+  const ids = new Set();
+  (dashboardReportsSnapshot || []).forEach(function (r) {
+    if (r && r.id != null) ids.add(String(r.id));
+  });
+  return items.filter(function (m) {
+    const rid = m.reportId != null ? String(m.reportId).trim() : "";
+    return rid && ids.has(rid);
+  });
+}
+
 function saveReportCalendarMarkersEntry(entry) {
   if (!entry || !entry.firstDate || !entry.reminderDate) return;
-  const items = getReportCalendarMarkers();
+  const reportId =
+    entry.reportId != null ? String(entry.reportId).trim() : "";
+  let items = getReportCalendarMarkers();
+  if (reportId) {
+    items = items.filter(function (it) {
+      return String(it.reportId || "") !== reportId;
+    });
+  }
   items.unshift({
     firstDate: entry.firstDate,
     reminderDate: entry.reminderDate,
     title: entry.title != null ? String(entry.title) : "",
     savedAt: new Date().toISOString(),
+    reportId: reportId,
   });
   while (items.length > 50) {
     items.pop();
@@ -536,6 +610,8 @@ const calendarState = {
 /** Ana sayfa: son çekilen raporlar (takvimde bitiş günleri + yaklaşan kart) */
 let dashboardReportsSnapshot = [];
 let dashboardCompanyNames = {};
+/** true: rapor listesi Appwrite’tan başarıyla alındı; takvim yerel işaretleri yalnızca depodaki $id ile eşleştirir */
+let dashboardReportsFetchSucceeded = false;
 
 function reportExpiryToCalendarISO(raw) {
   if (raw == null || raw === "") return null;
@@ -633,65 +709,144 @@ function formatMarkerAccordionDate(iso) {
 }
 
 /**
- * Takvimde yeşil/turuncu işaretlerin hangi rapora ait olduğunu listeler (localStorage işaretleri).
+ * İlk rapor tarihine göre gruplanmış liste; aynı gün birden fazla kayıt tek başlıkta (localStorage).
  */
 function renderCalendarMarkersAccordion() {
-  const body = document.getElementById("calendarMarkersAccordionBody");
-  const countEl = document.getElementById("calendarMarkersAccordionCount");
-  if (!body) return;
+  const root = document.getElementById("calendarMarkersByDateRoot");
+  if (!root) return;
 
-  const items = getReportCalendarMarkers();
-  if (countEl) {
-    countEl.textContent =
-      items.length > 0 ? "(" + items.length + ")" : "";
-  }
-
+  const items = getReportCalendarMarkersForCalendarUi();
   if (!items.length) {
-    body.innerHTML =
+    root.innerHTML =
       '<p class="calendar-markers-accordion__empty">Rapor veya QR kaydı sırasında seçtiğiniz <strong>ilk rapor</strong> ve <strong>son hatırlatıcı</strong> tarihleri burada görünür. Henüz kayıt yok.</p>';
     return;
   }
 
-  const frag = document.createDocumentFragment();
+  const groups = new Map();
+  const unknownBucket = [];
+
   items.forEach(function (it) {
-    const titleRaw =
-      it.title != null && String(it.title).trim()
-        ? String(it.title).trim()
-        : "Başlıksız rapor";
-    const row = document.createElement("div");
-    row.className = "calendar-markers-accordion__row";
-
-    const titleEl = document.createElement("div");
-    titleEl.className = "calendar-markers-accordion__title";
-    titleEl.textContent = titleRaw;
-
-    const dl = document.createElement("dl");
-    dl.className = "calendar-markers-accordion__dates";
-
-    const divFirst = document.createElement("div");
-    const dt1 = document.createElement("dt");
-    dt1.textContent = "İlk rapor";
-    const dd1 = document.createElement("dd");
-    dd1.textContent = formatMarkerAccordionDate(it.firstDate);
-    divFirst.appendChild(dt1);
-    divFirst.appendChild(dd1);
-
-    const divRem = document.createElement("div");
-    const dt2 = document.createElement("dt");
-    dt2.textContent = "Son hatırlatıcı";
-    const dd2 = document.createElement("dd");
-    dd2.textContent = formatMarkerAccordionDate(it.reminderDate);
-    divRem.appendChild(dt2);
-    divRem.appendChild(dd2);
-
-    dl.appendChild(divFirst);
-    dl.appendChild(divRem);
-    row.appendChild(titleEl);
-    row.appendChild(dl);
-    frag.appendChild(row);
+    const raw = it.firstDate != null ? String(it.firstDate) : "";
+    const key = raw.split("T")[0].trim();
+    if (key && /^\d{4}-\d{2}-\d{2}$/.test(key)) {
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key).push(it);
+    } else {
+      unknownBucket.push(it);
+    }
   });
 
-  body.replaceChildren(frag);
+  const dateKeys = Array.from(groups.keys()).sort(function (a, b) {
+    return b.localeCompare(a);
+  });
+
+  const frag = document.createDocumentFragment();
+
+  dateKeys.forEach(function (dateKey) {
+    const list = groups.get(dateKey);
+    if (!list || !list.length) return;
+
+    const details = document.createElement("details");
+    details.className = "calendar-markers-day";
+
+    const summary = document.createElement("summary");
+    summary.className = "calendar-markers-day__summary";
+    const dateLabel = formatMarkerAccordionDate(dateKey + "T12:00:00");
+
+    const spanDate = document.createElement("span");
+    spanDate.className = "calendar-markers-day__date";
+    spanDate.textContent = dateLabel;
+
+    const spanCount = document.createElement("span");
+    spanCount.className = "calendar-markers-day__count";
+    spanCount.textContent = "(" + list.length + ")";
+
+    const chev = document.createElement("i");
+    chev.className = "fa-solid fa-chevron-down calendar-markers-day__chev";
+    chev.setAttribute("aria-hidden", "true");
+
+    summary.appendChild(spanDate);
+    summary.appendChild(spanCount);
+    summary.appendChild(chev);
+
+    const body = document.createElement("div");
+    body.className = "calendar-markers-day__body";
+    const ul = document.createElement("ul");
+    ul.className = "calendar-markers-day__list";
+
+    list.forEach(function (it) {
+      const li = document.createElement("li");
+      li.className = "calendar-markers-day__item";
+      const titleRaw =
+        it.title != null && String(it.title).trim()
+          ? String(it.title).trim()
+          : "Başlıksız rapor";
+      const titleSpan = document.createElement("span");
+      titleSpan.className = "calendar-markers-day__title";
+      titleSpan.textContent = titleRaw;
+      const metaSpan = document.createElement("span");
+      metaSpan.className = "calendar-markers-day__meta";
+      metaSpan.textContent =
+        "Son hatırlatıcı: " + formatMarkerAccordionDate(it.reminderDate);
+      li.appendChild(titleSpan);
+      li.appendChild(metaSpan);
+      ul.appendChild(li);
+    });
+
+    body.appendChild(ul);
+    details.appendChild(summary);
+    details.appendChild(body);
+    frag.appendChild(details);
+  });
+
+  if (unknownBucket.length) {
+    const details = document.createElement("details");
+    details.className = "calendar-markers-day calendar-markers-day--unknown";
+    const summary = document.createElement("summary");
+    summary.className = "calendar-markers-day__summary";
+    const spanDate = document.createElement("span");
+    spanDate.className = "calendar-markers-day__date";
+    spanDate.textContent = "Tarih belirsiz";
+    const spanCount = document.createElement("span");
+    spanCount.className = "calendar-markers-day__count";
+    spanCount.textContent = "(" + unknownBucket.length + ")";
+    const chev = document.createElement("i");
+    chev.className = "fa-solid fa-chevron-down calendar-markers-day__chev";
+    chev.setAttribute("aria-hidden", "true");
+    summary.appendChild(spanDate);
+    summary.appendChild(spanCount);
+    summary.appendChild(chev);
+    const body = document.createElement("div");
+    body.className = "calendar-markers-day__body";
+    const ul = document.createElement("ul");
+    ul.className = "calendar-markers-day__list";
+    unknownBucket.forEach(function (it) {
+      const li = document.createElement("li");
+      li.className = "calendar-markers-day__item";
+      const titleRaw =
+        it.title != null && String(it.title).trim()
+          ? String(it.title).trim()
+          : "Başlıksız rapor";
+      const titleSpan = document.createElement("span");
+      titleSpan.className = "calendar-markers-day__title";
+      titleSpan.textContent = titleRaw;
+      const metaSpan = document.createElement("span");
+      metaSpan.className = "calendar-markers-day__meta";
+      metaSpan.textContent =
+        "Son hatırlatıcı: " + formatMarkerAccordionDate(it.reminderDate);
+      li.appendChild(titleSpan);
+      li.appendChild(metaSpan);
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+    details.appendChild(summary);
+    details.appendChild(body);
+    frag.appendChild(details);
+  }
+
+  root.replaceChildren(frag);
 }
 
 /**
@@ -723,7 +878,7 @@ function renderCalendar() {
   const tm = today.getMonth();
   const td = today.getDate();
 
-  const markers = getReportCalendarMarkers();
+  const markers = getReportCalendarMarkersForCalendarUi();
   const firstSet = new Set();
   const reminderSet = new Set();
   markers.forEach(function (it) {
@@ -1009,6 +1164,8 @@ async function loadDashboardData() {
     return;
   }
 
+  dashboardReportsFetchSucceeded = false;
+
   setStatsLoading();
   renderRecentReportsPlaceholder("Yükleniyor…", false);
 
@@ -1094,6 +1251,7 @@ async function loadDashboardData() {
         [aw.Query.orderDesc("$createdAt"), aw.Query.limit(400)]
       );
     } catch (e) {
+      dashboardReportsFetchSucceeded = false;
       dashboardReportsSnapshot = [];
       dashboardCompanyNames = {};
       renderCalendar();
@@ -1120,6 +1278,8 @@ async function loadDashboardData() {
     dashboardReportsSnapshot = aw.normalizeDocuments(
       reportsListRes.documents || []
     );
+    dashboardReportsFetchSucceeded = true;
+    pruneReportCalendarMarkersToExistingRows(dashboardReportsSnapshot);
     renderCalendar();
     renderUrgentUpcomingList();
 
@@ -1148,6 +1308,7 @@ async function loadDashboardData() {
       .join("");
   } catch (err) {
     setStatsMessage("!");
+    dashboardReportsFetchSucceeded = false;
     dashboardReportsSnapshot = [];
     dashboardCompanyNames = {};
     renderCalendar();

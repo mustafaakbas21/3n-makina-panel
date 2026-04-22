@@ -839,6 +839,101 @@ a.sidebar__logout {
   background: #ef4444;
 }
 
+.calendar-markers-by-date {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.calendar-markers-by-date__hint {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-muted, #64748b);
+}
+
+.calendar-markers-day {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  overflow: hidden;
+}
+
+.calendar-markers-day--unknown {
+  opacity: 0.95;
+}
+
+.calendar-markers-day__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text, #0f172a);
+  list-style: none;
+}
+
+.calendar-markers-day__summary::-webkit-details-marker {
+  display: none;
+}
+
+.calendar-markers-day__date {
+  flex: 1;
+}
+
+.calendar-markers-day__count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+}
+
+.calendar-markers-day__chev {
+  font-size: 0.65rem;
+  color: var(--text-muted, #64748b);
+  transition: transform 0.2s ease;
+}
+
+.calendar-markers-day[open] .calendar-markers-day__chev {
+  transform: rotate(180deg);
+}
+
+.calendar-markers-day__body {
+  padding: 0 0.65rem 0.65rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.calendar-markers-day__list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.calendar-markers-day__item {
+  padding: 0.45rem 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.calendar-markers-day__item:last-child {
+  border-bottom: none;
+}
+
+.calendar-markers-day__title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text, #0f172a);
+}
+
+.calendar-markers-day__meta {
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+}
+
 .calendar-markers-accordion {
   margin-top: 0.85rem;
   border: 1px solid rgba(148, 163, 184, 0.2);

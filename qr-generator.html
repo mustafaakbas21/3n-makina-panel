@@ -54,22 +54,29 @@
       background: #fff;
     }
 
-    /* html2pdf: gerçek A4 genişliği; ekran genişliğine göre sıkışmayı azaltır */
+    /* html2pdf: A4 genişliği; yatay padding kaldırıldı — tuval tam sayfa genişliğinde rasterlenir */
     #report-container {
       width: 210mm;
       max-width: 100%;
       margin: 0 auto;
-      padding: 10mm 15mm;
+      padding: 8mm 0;
       box-sizing: border-box;
       background: #fff;
       overflow: visible;
     }
-    #report-container table,
-    #report-container tr,
-    #report-container td,
+    #report-container .qr-studio-canvas-wrap {
+      width: 100%;
+      max-width: none;
+      box-sizing: border-box;
+    }
+    #report-container .qr-studio-canvas-wrap canvas {
+      width: 100% !important;
+      max-width: none !important;
+      height: auto !important;
+      display: block;
+    }
     #report-container .qr-wrapper,
-    #report-container .qr-wrapper canvas,
-    #report-container img {
+    #report-container .qr-wrapper canvas {
       page-break-inside: avoid;
       break-inside: avoid;
     }
@@ -93,7 +100,7 @@
         width: 210mm;
         max-width: 100%;
         margin: 0;
-        padding: 10mm 15mm;
+        padding: 8mm 0;
         box-sizing: border-box;
         box-shadow: none;
       }

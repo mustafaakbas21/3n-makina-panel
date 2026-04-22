@@ -706,6 +706,11 @@
             [aw.Query.orderDesc("$createdAt"), aw.Query.limit(500)]
           ));
       reportsCache = aw.normalizeDocuments(reportRes.documents || []);
+      if (
+        typeof window.__3nPruneReportCalendarMarkersToReportRows === "function"
+      ) {
+        window.__3nPruneReportCalendarMarkersToReportRows(reportsCache);
+      }
     } catch (reportErr) {
       tbody.innerHTML =
         '<tr class="data-table__loading data-table__error"><td colspan="6">' +
@@ -811,6 +816,12 @@
         return String(r.id) !== String(documentId);
       });
       applyFiltersAndRender();
+
+      if (
+        typeof window.__3nRemoveReportCalendarMarkerByReportId === "function"
+      ) {
+        window.__3nRemoveReportCalendarMarkerByReportId(documentId);
+      }
 
       if (pdfUrl && aw.storage) {
         const parsed = storageRefsFromPdfUrl(String(pdfUrl));
