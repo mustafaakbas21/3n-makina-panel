@@ -842,33 +842,103 @@
     }
   }
 
+  /**
+   * Appwrite Storage: tarayıcı fetch’i X-Appwrite-* olmadan 401/HTML dönebilir (beyaz/bozuk PDF).
+   * SDK client.call ile ArrayBuffer indirilir; çok sayfalı PDF için de güvenilir.
+   */
   async function downloadPdfFromUrl(url, filename, btn) {
     if (!url) return;
     if (btn) {
       btn.disabled = true;
       btn.dataset.originalText = btn.innerHTML;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> İndiriliyor...';
+      btn.innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> İndiriliyor...';
     }
-    try {
-      const response = await fetch(url, { method: 'GET', mode: 'cors' });
-      if (!response.ok) {
-        throw new Error('İndirme başarısız: ' + response.status + ' ' + response.statusText);
+    const aw = getAw();
+    const safeName = filename && String(filename).trim()
+      ? String(filename).trim()
+      : "3N_Rapor.pdf";
+
+    function triggerBlobDownload(blob) {
+      if (!blob || blob.size < 32) {
+        throw new Error("Sunucudan gelen dosya çok küçük veya boş.");
       }
-      const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = filename || '3N_Rapor.pdf';
+      a.download = /\.pdf$/i.test(safeName) ? safeName : safeName + ".pdf";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(blobUrl);
+    }
+
+    function openUrlFallback(href) {
+      const w = window.open(href, "_blank", "noopener,noreferrer");
+      if (!w) {
+        const a = document.createElement("a");
+        a.href = href;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    }
+
+    try {
+      const refs = parseAppwriteStorageFileFromViewUrl(String(url).trim());
+      if (
+        refs &&
+        refs.bucketId &&
+        refs.fileId &&
+        aw &&
+        typeof aw.fetchStorageFileDownloadArrayBuffer === "function"
+      ) {
+        const fetchBuf = function () {
+          return aw.fetchStorageFileDownloadArrayBuffer(
+            refs.bucketId,
+            refs.fileId
+          );
+        };
+        const buf = aw.withNetworkRetry
+          ? await aw.withNetworkRetry(fetchBuf, {
+              attempts: 4,
+              baseDelayMs: 500,
+            })
+          : await fetchBuf();
+        const blob = new Blob([buf], { type: "application/pdf" });
+        triggerBlobDownload(blob);
+        return;
+      }
+
+      const response = await fetch(String(url).trim(), {
+        method: "GET",
+        mode: "cors",
+        credentials: "omit",
+      });
+      if (!response.ok) {
+        throw new Error(
+          "İndirme başarısız: " + response.status + " " + response.statusText
+        );
+      }
+      const blob = await response.blob();
+      triggerBlobDownload(blob);
     } catch (err) {
-      window.alert('PDF indirilemedi: ' + (err && err.message ? err.message : String(err)));
+      try {
+        openUrlFallback(String(url).trim());
+      } catch (e2) {
+        window.alert(
+          "PDF indirilemedi: " +
+            (err && err.message ? err.message : String(err))
+        );
+      }
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = btn.dataset.originalText || '<i class="fa-solid fa-download" aria-hidden="true"></i> İndir';
+        btn.innerHTML =
+          btn.dataset.originalText ||
+          '<i class="fa-solid fa-download" aria-hidden="true"></i> İndir';
       }
     }
   }

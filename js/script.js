@@ -488,6 +488,13 @@ function parseCalendarISODate(s) {
   return { y: y, m: mo, d: d };
 }
 
+/** Takvim günü ile eşleşmek için ilk rapor / hatırlatıcı tarihini YYYY-MM-DD anahtarına indirger */
+function calendarMarkerIsoDay(raw) {
+  if (raw == null || raw === "") return "";
+  const head = String(raw).split("T")[0].trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(head) ? head : "";
+}
+
 function getReportCalendarMarkers() {
   try {
     const raw = localStorage.getItem(CALENDAR_MARKERS_STORAGE_KEY);
@@ -882,8 +889,10 @@ function renderCalendar() {
   const firstSet = new Set();
   const reminderSet = new Set();
   markers.forEach(function (it) {
-    if (it.firstDate) firstSet.add(it.firstDate);
-    if (it.reminderDate) reminderSet.add(it.reminderDate);
+    const fk = calendarMarkerIsoDay(it.firstDate);
+    if (fk) firstSet.add(fk);
+    const rk = calendarMarkerIsoDay(it.reminderDate);
+    if (rk) reminderSet.add(rk);
   });
 
   const expirySet = buildExpiryDateSetFromReports(dashboardReportsSnapshot);
@@ -905,11 +914,31 @@ function renderCalendar() {
     daySpan.textContent = String(cd);
     cell.appendChild(daySpan);
 
-    if (expirySet.has(iso)) {
-      const dot = document.createElement("span");
-      dot.className = "calendar-cell__dot calendar-cell__dot--expiry";
-      dot.setAttribute("aria-hidden", "true");
-      cell.appendChild(dot);
+    const hasFirst = firstSet.has(iso);
+    const hasReminder = reminderSet.has(iso);
+    const hasExpiry = expirySet.has(iso);
+    if (hasFirst || hasReminder || hasExpiry) {
+      const markerRow = document.createElement("span");
+      markerRow.className = "calendar-cell__markers";
+      if (hasFirst) {
+        const m = document.createElement("span");
+        m.className = "calendar-cell__marker calendar-cell__marker--first";
+        m.setAttribute("aria-hidden", "true");
+        markerRow.appendChild(m);
+      }
+      if (hasReminder) {
+        const m = document.createElement("span");
+        m.className = "calendar-cell__marker calendar-cell__marker--reminder";
+        m.setAttribute("aria-hidden", "true");
+        markerRow.appendChild(m);
+      }
+      if (hasExpiry) {
+        const m = document.createElement("span");
+        m.className = "calendar-cell__marker calendar-cell__marker--expiry";
+        m.setAttribute("aria-hidden", "true");
+        markerRow.appendChild(m);
+      }
+      cell.appendChild(markerRow);
     }
 
     let aria = iso;
@@ -929,10 +958,6 @@ function renderCalendar() {
     ) {
       cell.classList.add("calendar-cell--selected");
     }
-    if (firstSet.has(iso)) cell.classList.add("calendar-cell--has-first");
-    if (reminderSet.has(iso)) cell.classList.add("calendar-cell--has-reminder");
-    if (expirySet.has(iso)) cell.classList.add("calendar-cell--has-expiry");
-
     frag.appendChild(cell);
   }
 
