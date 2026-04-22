@@ -87,7 +87,8 @@
     return canvas.toDataURL("image/jpeg", q);
   }
   /** QR kaynak görüntüsü (küçültülünce/büyütülünce okunabilir kalsın) */
-  const QR_SOURCE_SIZE = 480;
+  /** Kaynak karekod rasterı (px); PDF’te PNG ile basıldığı için yüksek = daha keskin modüller */
+  const QR_SOURCE_SIZE = 640;
 
   /** Storage fileId — QR ile yüklemede aynı kimlik kullanılır */
   let currentQrStorageId = "";
@@ -348,12 +349,6 @@
       }
 
       if (!useMultiPage) {
-        var canvasDataUrl = fabricCanvas.toDataURL({
-          format: "jpeg",
-          quality: FABRIC_PDF_JPEG_QUALITY,
-          multiplier: FABRIC_PDF_MULTIPLIER,
-        });
-
         var canvasWidth = fabricCanvas.width;
         var canvasHeight = fabricCanvas.height;
         var imgScale = Math.min(A4_WIDTH / canvasWidth, A4_HEIGHT / canvasHeight);
@@ -362,7 +357,45 @@
         var offsetX = (A4_WIDTH - drawW) / 2;
         var offsetY = (A4_HEIGHT - drawH) / 2;
 
-        doc.addImage(canvasDataUrl, "JPEG", offsetX, offsetY, drawW, drawH);
+        if (qrFabricImage && lastQrDataUrl) {
+          /* Karekodu tek JPEG ile düzleştirmek modülleri bozar; arka plan JPEG + karekod PNG (çok sayfa ile aynı mantık). */
+          var prevQrVisible = qrFabricImage.visible !== false;
+          try {
+            qrFabricImage.visible = false;
+            fabricCanvas.requestRenderAll();
+            var bgOnlyDataUrl = fabricCanvas.toDataURL({
+              format: "jpeg",
+              quality: FABRIC_PDF_JPEG_QUALITY,
+              multiplier: FABRIC_PDF_MULTIPLIER,
+            });
+            doc.addImage(bgOnlyDataUrl, "JPEG", offsetX, offsetY, drawW, drawH);
+
+            var sx = qrFabricImage.scaleX || 1;
+            var sy = qrFabricImage.scaleY || 1;
+            var qrWf = qrFabricImage.width * sx;
+            var qrHf = qrFabricImage.height * sy;
+            var qrLeftFab = qrFabricImage.left - qrWf / 2;
+            var qrTopFab = qrFabricImage.top - qrHf / 2;
+            doc.addImage(
+              lastQrDataUrl,
+              "PNG",
+              offsetX + qrLeftFab * imgScale,
+              offsetY + qrTopFab * imgScale,
+              qrWf * imgScale,
+              qrHf * imgScale
+            );
+          } finally {
+            qrFabricImage.visible = prevQrVisible;
+            fabricCanvas.requestRenderAll();
+          }
+        } else {
+          var canvasDataUrl = fabricCanvas.toDataURL({
+            format: "jpeg",
+            quality: FABRIC_PDF_JPEG_QUALITY,
+            multiplier: FABRIC_PDF_MULTIPLIER,
+          });
+          doc.addImage(canvasDataUrl, "JPEG", offsetX, offsetY, drawW, drawH);
+        }
       }
 
       var pdfBlob = doc.output("blob");
@@ -798,9 +831,10 @@
         text: text,
         width: QR_SOURCE_SIZE,
         height: QR_SOURCE_SIZE,
-        colorDark: "#0f172a",
+        colorDark: "#000000",
         colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H,
+        /* Uzun URL’de H çok sık modül; M daha büyük modül + daha kolay okuma (editör ile aynı). */
+        correctLevel: QRCode.CorrectLevel.M,
       });
     } catch (e) {
       if (holder.parentNode) document.body.removeChild(holder);
@@ -825,7 +859,62 @@
           if (holder.parentNode) document.body.removeChild(holder);
           reject(e);
         }
-      }, 120);
+      }, 200);
+    });
+  }
+
+  /**
+   * Appwrite upload sonrası gelen tam view URL ile karekodu yeniler; konum/ölçek korunur (PDF yeniden üretimi için).
+   */
+  async function replaceFabricQrOverlayFromDataUrl(dataUrl) {
+    if (!fabricCanvas || !qrFabricImage || !dataUrl) {
+      return;
+    }
+    var prev = {
+      left: qrFabricImage.left,
+      top: qrFabricImage.top,
+      scaleX: qrFabricImage.scaleX,
+      scaleY: qrFabricImage.scaleY,
+      angle: qrFabricImage.angle || 0,
+      originX: qrFabricImage.originX || "center",
+      originY: qrFabricImage.originY || "center",
+    };
+    return new Promise(function (resolve, reject) {
+      try {
+        fabricCanvas.remove(qrFabricImage);
+      } catch (rm) {
+        /* — */
+      }
+      qrFabricImage = null;
+      fabric.Image.fromURL(
+        dataUrl,
+        function (img) {
+          if (!fabricCanvas) {
+            reject(new Error("Tuval yok."));
+            return;
+          }
+          img.set(
+            Object.assign({}, prev, {
+              cornerSize: 12,
+              transparentCorners: false,
+              borderColor: "#2563eb",
+              cornerColor: "#2563eb",
+              name: "qrOverlay",
+              objectCaching: false,
+              lockUniScaling: true,
+              centeredScaling: true,
+              lockScalingFlip: true,
+            })
+          );
+          fabricCanvas.add(img);
+          fabricCanvas.setActiveObject(img);
+          img.setCoords();
+          qrFabricImage = img;
+          fabricCanvas.requestRenderAll();
+          resolve();
+        },
+        { crossOrigin: "anonymous" }
+      );
     });
   }
 
@@ -879,8 +968,9 @@
           }
           const cw = fabricCanvas.getWidth();
           const ch = fabricCanvas.getHeight();
-          var targetW = Math.min(200, cw * 0.24);
-          if (targetW < 96) targetW = 96;
+          /* Basılı / telefon okuma: çok küçük QR okunmaz; ~%26 genişlik, en az ~140px mantıksal */
+          var targetW = Math.min(260, Math.max(140, cw * 0.26));
+          if (targetW > cw * 0.34) targetW = Math.floor(cw * 0.34);
           img.scaleToWidth(targetW);
           img.set({
             left: cw / 2,
@@ -1066,24 +1156,102 @@
               }
             }
 
-            const publicUrl = aw.pdfViewUrlFromUploadResult(
-              bucketId,
-              uploadResult
-            );
-            if (!publicUrl) {
+            if (!uploadResult || typeof uploadResult !== "object") {
+              throw new Error("Depo yükleme yanıtı geçersiz veya boş.");
+            }
+
+            setLoading(true, "Karekod bağlantısı doğrulanıyor…", true);
+
+            var canonicalPdfUrl = String(
+              aw.pdfViewUrlFromUploadResult(bucketId, uploadResult) || ""
+            ).trim();
+            if (!canonicalPdfUrl) {
               throw new Error(
                 "Yükleme yanıtında geçerli dosya kimliği ($id) yok; Storage URL oluşturulamadı."
               );
             }
 
+            lastQrDataUrl = await generateQrDataUrlFromText(canonicalPdfUrl);
+            await replaceFabricQrOverlayFromDataUrl(lastQrDataUrl);
+
+            setLoading(true, "PDF (karekod eşleşmesi) yeniden üretiliyor…", true);
+            workflowPdfBlob = await buildQrPdfBlobHtml2Pdf(
+              currentQrDisplayFileName
+            );
+            if (
+              !workflowPdfBlob ||
+              !(workflowPdfBlob instanceof Blob) ||
+              workflowPdfBlob.size < 64
+            ) {
+              throw new Error("Güncellenmiş PDF oluşturulamadı veya boş.");
+            }
+            normForUpload = normalizePdfBlobForUpload(workflowPdfBlob);
+            if (!normForUpload || !(normForUpload instanceof Blob)) {
+              throw new Error("Güncellenmiş PDF blob normalize edilemedi.");
+            }
+            workflowPdfFile = new File([normForUpload], uploadFileName, {
+              type: "application/pdf",
+            });
+
+            setLoading(true, "Depoda PDF güncelleniyor…", true);
+            if (typeof storageApi.deleteFile === "function") {
+              try {
+                await storageApi.deleteFile(bucketId, fileIdForUpload);
+              } catch (delErr) {
+                console.warn(
+                  "[3N] Depo dosyası silinemedi (yeniden yükleme öncesi):",
+                  delErr
+                );
+              }
+            }
+            try {
+              uploadResult = await oneUpload();
+            } catch (up2) {
+              var msg2 = up2 && up2.message ? String(up2.message) : "";
+              if (
+                msg2.indexOf("fetch") !== -1 ||
+                msg2.indexOf("Failed to fetch") !== -1 ||
+                msg2.indexOf("network") !== -1 ||
+                msg2.indexOf("QUIC") !== -1 ||
+                msg2.indexOf("HTTP2") !== -1
+              ) {
+                await new Promise(function (r) {
+                  setTimeout(r, 1200);
+                });
+                uploadResult = await oneUpload();
+              } else {
+                throw up2;
+              }
+            }
+
+            if (!uploadResult || typeof uploadResult !== "object") {
+              throw new Error("İkinci depo yükleme yanıtı geçersiz veya boş.");
+            }
+
+            var publicUrlAfterSecond = String(
+              aw.pdfViewUrlFromUploadResult(bucketId, uploadResult) || ""
+            ).trim();
+            if (!publicUrlAfterSecond) {
+              throw new Error(
+                "İkinci yüklemede görüntüleme URL oluşturulamadı."
+              );
+            }
+            if (publicUrlAfterSecond !== canonicalPdfUrl) {
+              console.warn(
+                "[3N] pdfUrl ikinci yüklemede farklı (DB yine karekod ile aynı tutulur):",
+                canonicalPdfUrl,
+                publicUrlAfterSecond
+              );
+            }
+
             if (typeof aw.assertReportPdfUrlIsStorageLinkOnly === "function") {
-              aw.assertReportPdfUrlIsStorageLinkOnly(publicUrl);
+              aw.assertReportPdfUrlIsStorageLinkOnly(canonicalPdfUrl);
             }
 
             const insertPayload = {
               title: reportTitle,
               companyId: companyId,
-              pdfUrl: publicUrl,
+              pdfUrl: canonicalPdfUrl,
               expiryDate: expiryVal,
             };
 

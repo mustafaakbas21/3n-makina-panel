@@ -107,6 +107,11 @@ function normalizeDocument(doc) {
   if (doc.$id != null) out.id = doc.$id;
   if (doc.$createdAt != null) out.createdAt = doc.$createdAt;
   if (doc.$updatedAt != null) out.updatedAt = doc.$updatedAt;
+  ["pdfUrl", "pdf_url"].forEach(function (k) {
+    if (out[k] != null && typeof out[k] === "string" && String(out[k]).trim()) {
+      out[k] = normalizeLegacyAppwriteStorageUrl(String(out[k]).trim());
+    }
+  });
   return out;
 }
 
