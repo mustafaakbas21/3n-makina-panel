@@ -161,29 +161,20 @@
    * QR kodlu sayfa işaretlenmişse sadece o sayfa, yoksa tüm sayfalar.
    */
   async function buildMultiPagePdfContent() {
-    if (!pdfJsDocument || pdfPageCount <= 1) {
+    if (!pdfJsDocument || pdfPageCount < 1) {
       return null;
     }
-    var targetPages = [];
-    if (qrOverlayPdfPage > 0 && qrOverlayPdfPage <= pdfPageCount) {
-      targetPages = [qrOverlayPdfPage];
-    } else {
-      for (var i = 1; i <= pdfPageCount; i++) {
-        targetPages.push(i);
-      }
-    }
 
-    var pagesHtml = [];
-    for (var idx = 0; idx < targetPages.length; idx++) {
-      var pageNum = targetPages[idx];
+    var pagesData = [];
+    for (var i = 1; i <= pdfPageCount; i++) {
       try {
-        const page = await pdfJsDocument.getPage(pageNum);
+        const page = await pdfJsDocument.getPage(i);
         const baseVp = page.getViewport({ scale: 1 });
         var rasterScale = PDF_MAX_RASTER_WIDTH / baseVp.width;
         if (baseVp.width * rasterScale < PDF_MIN_RASTER_WIDTH) {
           rasterScale = PDF_MIN_RASTER_WIDTH / baseVp.width;
         }
-        rasterScale = Math.min(rasterScale, 2.5);
+        rasterScale = Math.min(rasterScale, 2.0);
         const viewport = page.getViewport({ scale: rasterScale });
 
         const tmp = document.createElement("canvas");
@@ -198,19 +189,19 @@
         await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
         const dataUrl = tmp.toDataURL("image/png");
-        var isQrPage = (pageNum === qrOverlayPdfPage);
-        pagesHtml.push({
-          pageNum: pageNum,
+        var isQrPage = (qrOverlayPdfPage > 0 && i === qrOverlayPdfPage);
+        pagesData.push({
+          pageNum: i,
           dataUrl: dataUrl,
           width: tmp.width,
           height: tmp.height,
           isQrPage: isQrPage
         });
       } catch (e) {
-        console.warn("Sayfa " + pageNum + " render hatası:", e);
+        console.warn("Sayfa " + i + " render hatası:", e);
       }
     }
-    return pagesHtml;
+    return pagesData;
   }
 
   /**
