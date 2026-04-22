@@ -86,7 +86,10 @@ const DATABASE_ID = "69dcdeff0008deb14b78";
 /** scripts/setup-appwrite.cjs ile oluşturulan koleksiyon / bucket ID'leri */
 const COLLECTION_COMPANIES = "companies";
 const COLLECTION_REPORTS = "reports";
-/** Appwrite Storage bucket ($id) — konsolda oluşturulan depo */
+/**
+ * Appwrite Storage bucket $id — Konsol → Storage → ilgili depo → «$id» ile birebir aynı olmalı.
+ * Yanlış / eski ID veya başka projeden kopyalanmış ID → yüklemede 404 (sayfa yüklemede takılı kalabilir).
+ */
 const STORAGE_BUCKET_ID = "69dd6d03000313133460";
 const BUCKET_ID = STORAGE_BUCKET_ID;
 
@@ -315,6 +318,9 @@ window.__3nAppwrite = {
   /** QR / rapor hata ayıklama: tarayıcı konsolunda beklenen API host’unu doğrulayın */
   getApiEndpoint: function () {
     return String((client.config && client.config.endpoint) || "");
+  },
+  getStorageBucketId: function () {
+    return String(BUCKET_ID || "");
   },
   Query: Query,
   generateFileId: generateFileId,

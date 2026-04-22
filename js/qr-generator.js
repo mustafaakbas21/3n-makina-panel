@@ -21,7 +21,10 @@
     var extra = "";
     if (code === 404) {
       extra =
-        "\n\nStorage 404: Appwrite Konsolu → Ayarlar’daki «API Endpoint» adresi js/appwrite-config.mjs içindeki setEndpoint ile aynı olmalı (örn. Frankfurt: https://fra.cloud.appwrite.io/v1). Yanlış bölge veya bucket $id bu hatayı verir. Ayrıca Konsolda ağ sekmesinde isteğin hangi host’a gittiğini kontrol edin.";
+        "\n\nStorage 404: Genelde depo (bucket) bu projede yok veya $id yanlış. Appwrite → Storage’daki deponun $id değerini js/appwrite-config.mjs içindeki STORAGE_BUCKET_ID ile değiştirin. Endpoint doğru olsa da (fra.cloud…) yanlış bucket $id 404 verir.";
+    } else if (code === 401) {
+      extra =
+        "\n\n401: Depo veya dosya işlemi için Appwrite oturumu gerekli olabilir. Bucket izinlerinde «Herkes / guests» okuma-yazma açık mı kontrol edin; veya girişte Appwrite Account (session) kullanın.";
     } else if (code === 403) {
       extra =
         "\n\n403: Bu sitenin alan adı (örn. mustafaakbas21.github.io) Appwrite → Auth → Platforms → Web altında kayıtlı olmalı.";
@@ -30,6 +33,15 @@
       aw && typeof aw.getApiEndpoint === "function" ? aw.getApiEndpoint() : "";
     if (ep) {
       extra += "\n\nYapılandırılmış API: " + ep;
+    }
+    var bid =
+      aw && typeof aw.getStorageBucketId === "function"
+        ? aw.getStorageBucketId()
+        : aw && aw.BUCKET_REPORTS
+          ? String(aw.BUCKET_REPORTS)
+          : "";
+    if (bid) {
+      extra += "\n\nYapılandırılmış depo $id: " + bid;
     }
     return msg + extra;
   }
@@ -961,9 +973,22 @@
       return;
     }
 
-    setLoading(true, "PDF sıkıştırılıyor ve yükleniyor…", true);
+    setLoading(true, "Depo bağlantısı kontrol ediliyor…", true);
 
     try {
+      try {
+        await aw.storage.listFiles(aw.BUCKET_REPORTS, [aw.Query.limit(1)]);
+      } catch (probeErr) {
+        setLoading(false);
+        window.alert(
+          describeQrWorkflowError(probeErr, aw) +
+            "\n\nDepo erişilemiyor; PDF üretilmedi. Appwrite Konsolu → Storage → bucket $id ile appwrite-config.mjs (STORAGE_BUCKET_ID) eşleşmeli."
+        );
+        return;
+      }
+
+      setLoading(true, "PDF oluşturuluyor…", true);
+
       var WORKFLOW_MS = 240000;
       await Promise.race([
         (async function () {
@@ -998,6 +1023,8 @@
             workflowPdfFile = new File([normForUpload], uploadFileName, {
               type: "application/pdf",
             });
+
+            setLoading(true, "Depoya yükleniyor…", true);
 
             var bucketId = aw.BUCKET_REPORTS;
             var perms = aw.storageFilePermissionsReadAny;
@@ -1128,6 +1155,7 @@
       ]);
     } catch (error) {
       console.error("APPWRITE DETAYLI HATA:", error);
+      setLoading(false);
       window.alert(
         describeQrWorkflowError(error, getAw()) +
           "\n\nPDF oluşturma, yükleme veya veritabanı kaydı başarısız olabilir; yukarıdaki ipuçlarına bakın."
