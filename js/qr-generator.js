@@ -241,26 +241,29 @@
         reject(new Error("report-container bulunamadı."));
         return;
       }
-      if (fabricCanvas) {
-        try {
-          fabricCanvas.requestRenderAll();
-        } catch (rErr) {
-          /* — */
-        }
+
+      if (!fabricCanvas) {
+        reject(new Error("Tuval (canvas) bulunamadı. Önce bir belge yükleyin."));
+        return;
+      }
+
+      try {
+        fabricCanvas.requestRenderAll();
+      } catch (rErr) {
+        /* — */
       }
 
       var useMultiPage = (pdfJsDocument && pdfPageCount > 1);
-      var containerForPdf = el;
+
+      var wrapper = document.createElement("div");
+      wrapper.style.width = "794px";
+      wrapper.style.position = "relative";
+      wrapper.style.background = "#fff";
 
       if (useMultiPage) {
         try {
           var pagesData = await buildMultiPagePdfContent();
           if (pagesData && pagesData.length > 0) {
-            var wrapper = document.createElement("div");
-            wrapper.style.width = "794px";
-            wrapper.style.position = "relative";
-            wrapper.style.background = "#fff";
-
             pagesData.forEach(function (pg, idx) {
               var pageDiv = document.createElement("div");
               pageDiv.style.width = "794px";
@@ -290,8 +293,6 @@
                 var qrOverlay = document.createElement("img");
                 qrOverlay.src = lastQrDataUrl;
                 qrOverlay.style.position = "absolute";
-                var A4_WIDTH = 794;
-                var A4_HEIGHT = 1123;
                 var qrLeft = qrFabricImage.left - (qrFabricImage.width * qrFabricImage.scaleX) / 2;
                 var qrTop = qrFabricImage.top - (qrFabricImage.height * qrFabricImage.scaleY) / 2;
                 var qrWidth = qrFabricImage.width * qrFabricImage.scaleX;
@@ -305,17 +306,43 @@
 
               wrapper.appendChild(pageDiv);
             });
-
-            wrapper.style.position = "absolute";
-            wrapper.style.left = "-9999px";
-            wrapper.style.top = "0";
-            document.body.appendChild(wrapper);
-            containerForPdf = wrapper;
           }
         } catch (mpErr) {
           console.warn("Çok sayfalı hazırlık hatası, tek sayfa ile devam:", mpErr);
+          useMultiPage = false;
         }
       }
+
+      if (!useMultiPage) {
+        var canvasDataUrl = fabricCanvas.toDataURL({
+          format: "png",
+          quality: 1,
+          multiplier: 1
+        });
+
+        var pageDiv = document.createElement("div");
+        pageDiv.style.width = "794px";
+        pageDiv.style.height = "1123px";
+        pageDiv.style.position = "relative";
+        pageDiv.style.overflow = "hidden";
+        pageDiv.style.boxSizing = "border-box";
+
+        var img = document.createElement("img");
+        img.src = canvasDataUrl;
+        img.style.width = "794px";
+        img.style.height = "1123px";
+        img.style.display = "block";
+        img.style.objectFit = "contain";
+        pageDiv.appendChild(img);
+
+        wrapper.appendChild(pageDiv);
+      }
+
+      wrapper.style.position = "absolute";
+      wrapper.style.left = "-9999px";
+      wrapper.style.top = "0";
+      document.body.appendChild(wrapper);
+      var containerForPdf = wrapper;
 
       var opt = {
         margin: [0, 0, 0, 0],
@@ -355,7 +382,7 @@
               .from(containerForPdf)
               .outputPdf("blob")
               .then(function (pdfBlob) {
-                if (containerForPdf !== el && containerForPdf.parentNode) {
+                if (containerForPdf && containerForPdf.parentNode) {
                   document.body.removeChild(containerForPdf);
                 }
                 var normalized = normalizePdfBlobForUpload(pdfBlob);
@@ -370,7 +397,7 @@
                 resolve(normalized);
               })
               .catch(function (h2err) {
-                if (containerForPdf !== el && containerForPdf.parentNode) {
+                if (containerForPdf && containerForPdf.parentNode) {
                   document.body.removeChild(containerForPdf);
                 }
                 reject(
@@ -380,7 +407,7 @@
                 );
               });
           } catch (e) {
-            if (containerForPdf !== el && containerForPdf.parentNode) {
+            if (containerForPdf && containerForPdf.parentNode) {
               document.body.removeChild(containerForPdf);
             }
             reject(e);
