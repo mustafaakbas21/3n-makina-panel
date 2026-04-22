@@ -55,29 +55,43 @@
     }
 
     /* html2pdf: A4 boyutunda tam sayfa - kayma olmadan */
+    body {
+      margin: 0;
+      padding: 0;
+    }
     #report-container {
       width: 794px;
+      height: 1123px;
       max-width: 794px;
-      min-height: 1123px;
-      margin: 0 auto;
+      max-height: 1123px;
+      margin: 0;
       padding: 0;
       box-sizing: border-box;
       background: #fff;
-      overflow: visible;
+      overflow: hidden;
       position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     #report-container .qr-studio-canvas-wrap {
       width: 794px;
-      max-width: 794px;
       height: 1123px;
+      max-width: 794px;
+      max-height: 1123px;
       box-sizing: border-box;
       position: relative;
+      margin: 0;
+      padding: 0;
     }
     #report-container .qr-studio-canvas-wrap canvas {
       width: 794px !important;
-      max-width: 794px !important;
       height: 1123px !important;
+      max-width: 794px !important;
+      max-height: 1123px !important;
       display: block;
+      margin: 0;
+      padding: 0;
     }
     #report-container .qr-wrapper,
     #report-container .qr-wrapper canvas {
@@ -98,15 +112,18 @@
         visibility: visible;
       }
       #report-container {
-        position: absolute;
+        position: fixed;
         left: 0;
         top: 0;
         width: 794px;
-        max-width: 794px;
+        height: 1123px;
         margin: 0;
         padding: 0;
         box-sizing: border-box;
         box-shadow: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
     }
 

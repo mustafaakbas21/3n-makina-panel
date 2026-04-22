@@ -157,11 +157,68 @@
   }
 
   /**
+   * Tüm PDF sayfalarını (eğer varsa) render edip, birleşik HTML oluştur.
+   * QR kodlu sayfa işaretlenmişse sadece o sayfa, yoksa tüm sayfalar.
+   */
+  async function buildMultiPagePdfContent() {
+    if (!pdfJsDocument || pdfPageCount <= 1) {
+      return null;
+    }
+    var targetPages = [];
+    if (qrOverlayPdfPage > 0 && qrOverlayPdfPage <= pdfPageCount) {
+      targetPages = [qrOverlayPdfPage];
+    } else {
+      for (var i = 1; i <= pdfPageCount; i++) {
+        targetPages.push(i);
+      }
+    }
+
+    var pagesHtml = [];
+    for (var idx = 0; idx < targetPages.length; idx++) {
+      var pageNum = targetPages[idx];
+      try {
+        const page = await pdfJsDocument.getPage(pageNum);
+        const baseVp = page.getViewport({ scale: 1 });
+        var rasterScale = PDF_MAX_RASTER_WIDTH / baseVp.width;
+        if (baseVp.width * rasterScale < PDF_MIN_RASTER_WIDTH) {
+          rasterScale = PDF_MIN_RASTER_WIDTH / baseVp.width;
+        }
+        rasterScale = Math.min(rasterScale, 2.5);
+        const viewport = page.getViewport({ scale: rasterScale });
+
+        const tmp = document.createElement("canvas");
+        const ctx = tmp.getContext("2d", { alpha: false });
+        if (!ctx) continue;
+        ctx.imageSmoothingEnabled = true;
+        if ("imageSmoothingQuality" in ctx) {
+          ctx.imageSmoothingQuality = "high";
+        }
+        tmp.width = Math.floor(viewport.width);
+        tmp.height = Math.floor(viewport.height);
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+        const dataUrl = tmp.toDataURL("image/png");
+        var isQrPage = (pageNum === qrOverlayPdfPage);
+        pagesHtml.push({
+          pageNum: pageNum,
+          dataUrl: dataUrl,
+          width: tmp.width,
+          height: tmp.height,
+          isQrPage: isQrPage
+        });
+      } catch (e) {
+        console.warn("Sayfa " + pageNum + " render hatası:", e);
+      }
+    }
+    return pagesHtml;
+  }
+
+  /**
    * #report-container (Fabric tuvali) → html2pdf → sıkıştırılmış PDF Blob.
    * A4 boyutunda, çok sayfalı, kayma olmayan çıktı.
    */
   function buildQrPdfBlobHtml2Pdf(displayFilename) {
-    return new Promise(function (resolve, reject) {
+    return new Promise(async function (resolve, reject) {
       if (typeof window.html2pdf !== "function") {
         reject(
           new Error(
@@ -170,6 +227,15 @@
         );
         return;
       }
+
+      var fname =
+        displayFilename && String(displayFilename).trim()
+          ? String(displayFilename).trim()
+          : "3N_Rapor.pdf";
+      if (!/\.pdf$/i.test(fname)) {
+        fname += ".pdf";
+      }
+
       var el = document.getElementById("report-container");
       if (!el) {
         reject(new Error("report-container bulunamadı."));
@@ -183,12 +249,72 @@
         }
       }
 
-      var fname =
-        displayFilename && String(displayFilename).trim()
-          ? String(displayFilename).trim()
-          : "3N_Rapor.pdf";
-      if (!/\.pdf$/i.test(fname)) {
-        fname += ".pdf";
+      var useMultiPage = (pdfJsDocument && pdfPageCount > 1);
+      var containerForPdf = el;
+
+      if (useMultiPage) {
+        try {
+          var pagesData = await buildMultiPagePdfContent();
+          if (pagesData && pagesData.length > 0) {
+            var wrapper = document.createElement("div");
+            wrapper.style.width = "794px";
+            wrapper.style.position = "relative";
+            wrapper.style.background = "#fff";
+
+            pagesData.forEach(function (pg, idx) {
+              var pageDiv = document.createElement("div");
+              pageDiv.style.width = "794px";
+              pageDiv.style.height = "1123px";
+              pageDiv.style.position = "relative";
+              pageDiv.style.overflow = "hidden";
+              pageDiv.style.pageBreakAfter = (idx < pagesData.length - 1) ? "always" : "auto";
+              pageDiv.style.breakAfter = (idx < pagesData.length - 1) ? "page" : "auto";
+              pageDiv.style.boxSizing = "border-box";
+
+              var img = document.createElement("img");
+              img.src = pg.dataUrl;
+              var imgScale = Math.min(794 / pg.width, 1123 / pg.height);
+              var drawW = pg.width * imgScale;
+              var drawH = pg.height * imgScale;
+              var offsetX = (794 - drawW) / 2;
+              var offsetY = (1123 - drawH) / 2;
+              img.style.width = drawW + "px";
+              img.style.height = drawH + "px";
+              img.style.position = "absolute";
+              img.style.left = offsetX + "px";
+              img.style.top = offsetY + "px";
+              img.style.display = "block";
+              pageDiv.appendChild(img);
+
+              if (pg.isQrPage && lastQrDataUrl && qrFabricImage) {
+                var qrOverlay = document.createElement("img");
+                qrOverlay.src = lastQrDataUrl;
+                qrOverlay.style.position = "absolute";
+                var A4_WIDTH = 794;
+                var A4_HEIGHT = 1123;
+                var qrLeft = qrFabricImage.left - (qrFabricImage.width * qrFabricImage.scaleX) / 2;
+                var qrTop = qrFabricImage.top - (qrFabricImage.height * qrFabricImage.scaleY) / 2;
+                var qrWidth = qrFabricImage.width * qrFabricImage.scaleX;
+                var qrHeight = qrFabricImage.height * qrFabricImage.scaleY;
+                qrOverlay.style.left = qrLeft + "px";
+                qrOverlay.style.top = qrTop + "px";
+                qrOverlay.style.width = qrWidth + "px";
+                qrOverlay.style.height = qrHeight + "px";
+                pageDiv.appendChild(qrOverlay);
+              }
+
+              wrapper.appendChild(pageDiv);
+            });
+
+            wrapper.style.position = "absolute";
+            wrapper.style.left = "-9999px";
+            wrapper.style.top = "0";
+            document.body.appendChild(wrapper);
+            containerForPdf = wrapper;
+          }
+        } catch (mpErr) {
+          console.warn("Çok sayfalı hazırlık hatası, tek sayfa ile devam:", mpErr);
+        }
       }
 
       var opt = {
@@ -196,7 +322,7 @@
         filename: fname,
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
-          scale: 2,
+          scale: 1,
           useCORS: true,
           letterRendering: true,
           logging: false,
@@ -206,16 +332,18 @@
           windowWidth: 794,
           scrollX: 0,
           scrollY: 0,
+          x: 0,
+          y: 0,
         },
         jsPDF: {
           unit: "pt",
-          format: "a4",
+          format: [794, 1123],
           orientation: "portrait",
           compress: true,
           putOnlyUsedFonts: true,
           floatPrecision: 16,
         },
-        pagebreak: { mode: ['css'], before: '.page-break', after: '.page-break', avoid: 'canvas' },
+        pagebreak: { mode: ['avoid-all'] },
       };
 
       requestAnimationFrame(function () {
@@ -224,9 +352,12 @@
             window
               .html2pdf()
               .set(opt)
-              .from(el)
+              .from(containerForPdf)
               .outputPdf("blob")
               .then(function (pdfBlob) {
+                if (containerForPdf !== el && containerForPdf.parentNode) {
+                  document.body.removeChild(containerForPdf);
+                }
                 var normalized = normalizePdfBlobForUpload(pdfBlob);
                 if (!normalized || normalized.size < 64) {
                   reject(
@@ -239,6 +370,9 @@
                 resolve(normalized);
               })
               .catch(function (h2err) {
+                if (containerForPdf !== el && containerForPdf.parentNode) {
+                  document.body.removeChild(containerForPdf);
+                }
                 reject(
                   h2err && h2err.message
                     ? h2err
@@ -246,6 +380,9 @@
                 );
               });
           } catch (e) {
+            if (containerForPdf !== el && containerForPdf.parentNode) {
+              document.body.removeChild(containerForPdf);
+            }
             reject(e);
           }
         });
@@ -413,13 +550,12 @@
   }
 
   /**
-   * PNG dataUrl → Fabric arka plan (ölçekli)
+   * PNG dataUrl → Fabric arka plan (A4 boyutunda, ortalanmış)
    */
   function openImageDataUrlAsFabricBackground(dataUrl, pixelW, pixelH) {
     return new Promise(function (resolve, reject) {
-      const scale = Math.min(1, MAX_CANVAS_WIDTH / pixelW);
-      const vw = pixelW * scale;
-      const vh = pixelH * scale;
+      const A4_WIDTH = 794;
+      const A4_HEIGHT = 1123;
 
       const el = document.getElementById("pdfCanvas");
       if (!el) {
@@ -429,8 +565,8 @@
 
       disposeFabric();
       fabricCanvas = new fabric.Canvas("pdfCanvas", {
-        width: vw,
-        height: vh,
+        width: A4_WIDTH,
+        height: A4_HEIGHT,
         backgroundColor: "#ffffff",
         preserveObjectStacking: true,
         enableRetinaScaling: true,
@@ -446,11 +582,18 @@
           }
           const nw = img.width || 1;
           const nh = img.height || 1;
+
+          var imgScale = Math.min(A4_WIDTH / nw, A4_HEIGHT / nh);
+          var drawW = nw * imgScale;
+          var drawH = nh * imgScale;
+          var offsetX = (A4_WIDTH - drawW) / 2;
+          var offsetY = (A4_HEIGHT - drawH) / 2;
+
           img.set({
-            left: 0,
-            top: 0,
-            scaleX: vw / nw,
-            scaleY: vh / nh,
+            left: offsetX,
+            top: offsetY,
+            scaleX: imgScale,
+            scaleY: imgScale,
             selectable: false,
             evented: false,
             hasControls: false,
