@@ -336,7 +336,7 @@
           "<td>" +
           escapeHtml(fileType) +
           "</td>" +
-          "<td class=\"data-table__actions\">" +
+          "<td class=\"data-table__actions\"><div class=\"report-actions\">" +
           (downloadDisabled
             ? "<span class=\"download-btn download-btn--disabled\" aria-disabled=\"true\"" +
               brokenTitle +
@@ -352,6 +352,13 @@
               "\" rel=\"noopener noreferrer\">" +
               "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
               "</a>") +
+          (!downloadDisabled && urlAttr
+            ? "<a class=\"report-view-btn\" href=\"" +
+              urlAttr +
+              "\" target=\"_blank\" rel=\"noopener noreferrer\" title=\"PDF’yi yeni sekmede aç\">" +
+              "<i class=\"fa-solid fa-up-right-from-square\" aria-hidden=\"true\"></i> Aç" +
+              "</a>"
+            : "") +
           (id
             ? "<button type=\"button\" class=\"delete-report-btn\" data-document-id=\"" +
               id +
@@ -359,7 +366,7 @@
               "<i class=\"fa-solid fa-trash\" aria-hidden=\"true\"></i> Sil" +
               "</button>"
             : "") +
-          "</td>" +
+          "</div></td>" +
           "</tr>"
         );
       })
@@ -561,11 +568,20 @@
 
     var publicUrl = "";
     try {
-      const uploadResult = await aw.storage.createFile(
-        aw.BUCKET_REPORTS,
-        storageFileId,
-        uploadFile
-      );
+      var uploadPerms = aw.storageFilePermissionsReadAny;
+      const uploadResult =
+        uploadPerms && uploadPerms.length
+          ? await aw.storage.createFile(
+              aw.BUCKET_REPORTS,
+              storageFileId,
+              uploadFile,
+              uploadPerms
+            )
+          : await aw.storage.createFile(
+              aw.BUCKET_REPORTS,
+              storageFileId,
+              uploadFile
+            );
       console.log("Appwrite'dan Dönen Dosya Cevabı:", uploadResult);
       publicUrl = aw.pdfViewUrlFromUploadResult(
         aw.BUCKET_REPORTS,

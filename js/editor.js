@@ -1411,11 +1411,20 @@ async function saveReportAndUpload() {
       return;
     }
     const pdfFile = aw.blobToFile(pdfBlob, currentReportFileName);
-    const uploadResult = await aw.storage.createFile(
-      aw.BUCKET_REPORT_PDFS,
-      currentReportStorageId,
-      pdfFile
-    );
+    var uploadPerms = aw.storageFilePermissionsReadAny;
+    const uploadResult =
+      uploadPerms && uploadPerms.length
+        ? await aw.storage.createFile(
+            aw.BUCKET_REPORT_PDFS,
+            currentReportStorageId,
+            pdfFile,
+            uploadPerms
+          )
+        : await aw.storage.createFile(
+            aw.BUCKET_REPORT_PDFS,
+            currentReportStorageId,
+            pdfFile
+          );
     console.log("Appwrite'dan Dönen Dosya Cevabı:", uploadResult);
     const publicUrl = aw.pdfViewUrlFromUploadResult(
       aw.BUCKET_REPORT_PDFS,

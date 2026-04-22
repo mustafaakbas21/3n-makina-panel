@@ -1617,9 +1617,12 @@ a.sidebar__logout {
 .reports-table-wrap .data-table--reports td.data-table__actions {
   overflow: visible;
   white-space: normal;
-  width: 1%;
+  width: 260px;
+  min-width: 260px;
   max-width: none;
   text-overflow: clip;
+  text-align: right;
+  vertical-align: middle;
 }
 
 .data-table--reports .download-btn {
@@ -1657,10 +1660,41 @@ a.sidebar__logout {
 }
 
 .data-table--reports td.data-table__actions {
-  display: flex;
+  display: table-cell;
+  vertical-align: middle;
+  text-align: right;
+  white-space: normal;
+}
+
+.data-table--reports td.data-table__actions > .report-actions {
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
+}
+
+.data-table--reports .report-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--sidebar-border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.data-table--reports .report-view-btn:hover {
+  background: #f1f5f9;
+  border-color: rgba(37, 99, 235, 0.25);
+  color: var(--text);
 }
 
 .data-table--reports .delete-report-btn {

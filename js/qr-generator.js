@@ -16,16 +16,14 @@
   const MAX_CANVAS_WIDTH = 920;
   /** PDF.js: sayfa raster’ı en az bu kadar geniş (net önizleme + PDF için) */
   const PDF_MIN_RASTER_WIDTH = 1280;
-  const PDF_MAX_RASTER_WIDTH = 2400;
+  const PDF_MAX_RASTER_WIDTH = 2000;
   /** html2canvas (Word/Excel HTML → görüntü) */
   const SNAPSHOT_HTML_SCALE = 2.25;
   /** Fabric → jsPDF: A4 raster çarpanı (Retina tuval ile birlikte çok büyümemesi için ~2–2.5) */
-  const PDF_EXPORT_MULTIPLIER = 2.35;
+  /** Düşük tutulur: büyük PNG → Appwrite multipart / HTTP2 hataları (Failed to fetch) tetikleyebilir */
+  const PDF_EXPORT_MULTIPLIER = 1.72;
   /** QR kaynak görüntüsü (küçültülünce/büyütülünce okunabilir kalsın) */
   const QR_SOURCE_SIZE = 480;
-
-  /** Appwrite konsol bucket id — QR URL ve createFile ile aynı */
-  const QR_STORAGE_BUCKET_ID = "69dd6d03000313133460";
 
   /** Appwrite Storage fileId — QR’daki URL ile yüklemedeki fileId aynı olmalı (CDN ID.unique) */
   let currentQrStorageId = "";
@@ -355,7 +353,7 @@
             var qx = (qrObj.left - qrObj.getScaledWidth() / 2) * sx;
             var qy = (qrObj.top - qrObj.getScaledHeight() / 2) * sy;
             ctx.drawImage(qrImg, qx, qy, qw, qh);
-            resolve(c.toDataURL("image/png"));
+            resolve(c.toDataURL("image/jpeg", 0.88));
           } catch (e) {
             reject(e);
           }
@@ -424,7 +422,7 @@
           fcW,
           fcH
         );
-        pdf.addImage(merged, "PNG", 0, 0, pageW, pageH);
+        pdf.addImage(merged, "JPEG", 0, 0, pageW, pageH);
       }
     }
     return pdf.output("blob");
@@ -432,7 +430,8 @@
 
   function buildPdfBlobFromFabric(fc) {
     const imgData = fc.toDataURL({
-      format: "png",
+      format: "jpeg",
+      quality: 0.88,
       multiplier: PDF_EXPORT_MULTIPLIER,
     });
     if (typeof window.jspdf === "undefined" || !window.jspdf.jsPDF) {
@@ -446,7 +445,7 @@
     });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    pdf.addImage(imgData, "PNG", 0, 0, pageW, pageH);
+    pdf.addImage(imgData, "JPEG", 0, 0, pageW, pageH);
     return pdf.output("blob");
   }
 
@@ -954,81 +953,118 @@
     setLoading(true, "PDF oluşturuluyor ve yükleniyor…");
 
     try {
-      const storageApi = aw.storage;
-      if (!storageApi || typeof storageApi.createFile !== "function") {
-        throw new Error(
-          "aw.storage.createFile yok — appwrite-config.mjs ve CDN sırasını kontrol edin."
-        );
-      }
+      var WORKFLOW_MS = 240000;
+      await Promise.race([
+        (async function () {
+          const storageApi = aw.storage;
+          if (!storageApi || typeof storageApi.createFile !== "function") {
+            throw new Error(
+              "aw.storage.createFile yok — appwrite-config.mjs ve CDN sırasını kontrol edin."
+            );
+          }
 
-      const pdfBlob = await buildExportPdfBlob();
-      const pdfFile = aw.blobToFile(pdfBlob, currentQrDisplayFileName);
+          const pdfBlob = await buildExportPdfBlob();
+          const pdfFile = aw.blobToFile(pdfBlob, currentQrDisplayFileName);
 
-      var fileIdForUpload = currentQrStorageId;
+          var fileIdForUpload = currentQrStorageId;
 
-      if (!fileIdForUpload) {
-        throw new Error(
-          "Depo dosya kimliği yok — newUniqueFileId başarısız (sayfayı yenileyin)."
-        );
-      }
-      if (aw.isValidStorageFileId && !aw.isValidStorageFileId(fileIdForUpload)) {
-        throw new Error("Üretilen dosya kimliği geçersiz.");
-      }
+          if (!fileIdForUpload) {
+            throw new Error(
+              "Depo dosya kimliği yok — newUniqueFileId başarısız (sayfayı yenileyin)."
+            );
+          }
+          if (aw.isValidStorageFileId && !aw.isValidStorageFileId(fileIdForUpload)) {
+            throw new Error("Üretilen dosya kimliği geçersiz.");
+          }
 
-      console.log("[3N] storage.createFile bucket / fileId:", QR_STORAGE_BUCKET_ID, fileIdForUpload);
+          var bucketId = aw.BUCKET_REPORTS;
+          var perms = aw.storageFilePermissionsReadAny;
+          console.log("[3N] storage.createFile bucket / fileId:", bucketId, fileIdForUpload);
 
-      /** createFile(bucketId, fileId, file) — fileId, QR üretilirken generateFileId() ile oluşturulan currentQrStorageId ile aynı olmalı (burada yeniden generateFileId çağırılmaz). */
-      const uploadResult = await storageApi.createFile(
-        QR_STORAGE_BUCKET_ID,
-        fileIdForUpload,
-        pdfFile
-      );
-      console.log("Appwrite'dan Dönen Dosya Cevabı:", uploadResult);
-      const publicUrl = aw.pdfViewUrlFromUploadResult(
-        aw.BUCKET_REPORTS,
-        uploadResult
-      );
-      if (!publicUrl) {
-        throw new Error(
-          "Yükleme yanıtında geçerli dosya kimliği ($id) yok; PDF adresi oluşturulamadı."
-        );
-      }
+          function oneUpload() {
+            return perms && perms.length
+              ? storageApi.createFile(bucketId, fileIdForUpload, pdfFile, perms)
+              : storageApi.createFile(bucketId, fileIdForUpload, pdfFile);
+          }
 
-      triggerPdfDownload(publicUrl, currentQrDisplayFileName);
+          var uploadResult;
+          try {
+            uploadResult = await oneUpload();
+          } catch (up1) {
+            var msg1 = up1 && up1.message ? String(up1.message) : "";
+            if (
+              msg1.indexOf("fetch") !== -1 ||
+              msg1.indexOf("Failed to fetch") !== -1 ||
+              msg1.indexOf("network") !== -1 ||
+              msg1.indexOf("QUIC") !== -1 ||
+              msg1.indexOf("HTTP2") !== -1
+            ) {
+              await new Promise(function (r) {
+                setTimeout(r, 1200);
+              });
+              uploadResult = await oneUpload();
+            } else {
+              throw up1;
+            }
+          }
 
-      const insertPayload = {
-        title: title,
-        companyId: companyId,
-        pdfUrl: publicUrl,
-        expiryDate: expiryVal,
-      };
+          console.log("Appwrite'dan Dönen Dosya Cevabı:", uploadResult);
+          const publicUrl = aw.pdfViewUrlFromUploadResult(bucketId, uploadResult);
+          if (!publicUrl) {
+            throw new Error(
+              "Yükleme yanıtında geçerli dosya kimliği ($id) yok; PDF adresi oluşturulamadı."
+            );
+          }
 
-      await aw.databases.createDocument(
-        aw.DATABASE_ID,
-        aw.COLLECTION_REPORTS,
-        aw.newUniqueFileId(),
-        insertPayload
-      );
+          triggerPdfDownload(publicUrl, currentQrDisplayFileName);
 
-      const calDates = getQrCalendarDateValues();
-      if (typeof window.__3nSaveReportCalendarMarkers === "function") {
-        window.__3nSaveReportCalendarMarkers({
-          firstDate: calDates.firstDate,
-          reminderDate: calDates.reminderDate,
-          title: title,
-        });
-      }
+          const insertPayload = {
+            title: title,
+            companyId: companyId,
+            pdfUrl: publicUrl,
+            expiryDate: expiryVal,
+          };
 
-      setLoading(false);
-      window.alert(
-        "İşlem tamamlandı. PDF bilgisayarınıza indirildi, depoya yüklendi ve rapor listesine eklendi.\n\nBir sonraki belge için karekodu yenilemek üzere «Karekodu Yerleştir / Yenile» düğmesine basın (yeni dosya adresi oluşturuldu)."
-      );
+          await aw.databases.createDocument(
+            aw.DATABASE_ID,
+            aw.COLLECTION_REPORTS,
+            aw.newUniqueFileId(),
+            insertPayload
+          );
 
-      assignNewQrFileName();
+          const calDates = getQrCalendarDateValues();
+          if (typeof window.__3nSaveReportCalendarMarkers === "function") {
+            window.__3nSaveReportCalendarMarkers({
+              firstDate: calDates.firstDate,
+              reminderDate: calDates.reminderDate,
+              title: title,
+            });
+          }
+
+          window.alert(
+            "İşlem tamamlandı. PDF bilgisayarınıza indirildi, depoya yüklendi ve rapor listesine eklendi.\n\nBir sonraki belge için karekodu yenilemek üzere «Karekodu Yerleştir / Yenile» düğmesine basın (yeni dosya adresi oluşturuldu)."
+          );
+
+          assignNewQrFileName();
+        })(),
+        new Promise(function (_, rej) {
+          setTimeout(function () {
+            rej(
+              new Error(
+                "İşlem zaman aşımına uğradı (4 dk). PDF çok büyük veya ağ/Appwrite bağlantısı kesilmiş olabilir; daha kısa belge veya farklı tarayıcı deneyin."
+              )
+            );
+          }, WORKFLOW_MS);
+        }),
+      ]);
     } catch (error) {
-      setLoading(false);
       console.error("APPWRITE DETAYLI HATA:", error);
-      window.alert(error && error.message ? error.message : String(error));
+      window.alert(
+        (error && error.message ? error.message : String(error)) +
+          "\n\nİpucu: Opera GX’te «Failed to fetch» / HTTP2 hatası görülüyorsa Chrome ile deneyin; Appwrite’da bu site için Web platformu ve Storage bucket izinlerini kontrol edin."
+      );
+    } finally {
+      setLoading(false);
     }
   }
 

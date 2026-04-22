@@ -17,6 +17,23 @@ if (!AppwriteGlobal || !AppwriteGlobal.Client) {
 }
 
 const { Client, Account, Databases, Storage, Query } = AppwriteGlobal;
+const Permission = AppwriteGlobal.Permission;
+const Role = AppwriteGlobal.Role;
+
+/** Storage createFile: PDF’lerin view/indir URL’lerinin oturumsuz çalışması için (bucket şemasına uygun). */
+var storageFilePermissionsReadAny = null;
+if (
+  Permission &&
+  Role &&
+  typeof Permission.read === "function" &&
+  typeof Role.any === "function"
+) {
+  try {
+    storageFilePermissionsReadAny = [Permission.read(Role.any())];
+  } catch (permErr) {
+    storageFilePermissionsReadAny = null;
+  }
+}
 
 /** Appwrite Storage fileId: en fazla 36 karakter; a-z, A-Z, 0-9, _ ; başta _ olamaz. */
 function isValidStorageFileId(id) {
@@ -222,6 +239,7 @@ window.__3nAppwrite = {
   blobToFile: blobToFile,
   fetchStorageFileDownloadArrayBuffer: fetchStorageFileDownloadArrayBuffer,
   parseStorageFileFromViewUrl: parseStorageFileFromViewUrl,
+  storageFilePermissionsReadAny: storageFilePermissionsReadAny,
 };
 
 export { generateFileId, newUniqueFileId, isValidStorageFileId };
