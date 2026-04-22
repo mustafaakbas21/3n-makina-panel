@@ -340,13 +340,22 @@
               ">" +
               "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
               "</span>"
-            : "<a class=\"download-btn\" role=\"button\" href=\"" +
-              downloadHrefEsc +
-              "\" download=\"" +
+            : "<button type=\"button\" class=\"download-btn\" title=\"PDF indir\"" +
+              " data-bucket-id=\"" +
+              escapeHtml(
+                stParts && stParts.bucketId ? String(stParts.bucketId) : ""
+              ) +
+              "\" data-file-id=\"" +
+              escapeHtml(
+                stParts && stParts.fileId ? String(stParts.fileId) : ""
+              ) +
+              "\" data-download-name=\"" +
               downloadNameAttr +
-              "\" target=\"_blank\" rel=\"noopener noreferrer\" title=\"PDF indir veya yeni sekmede aç\">" +
+              "\" data-fallback-url=\"" +
+              downloadHrefEsc +
+              "\">" +
               "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
-              "</a>") +
+              "</button>") +
           (!downloadDisabled && urlAttr
             ? "<a class=\"report-view-btn\" href=\"" +
               urlAttr +
@@ -842,10 +851,144 @@
     }
   }
 
+  /**
+   * Appwrite istemcisinin gönderdiği başlıklarla GET (yalnızca ?project= olan <a> bazen 401/boş döner).
+   */
+  function appwriteClientFetchHeaders(aw) {
+    if (!aw || !aw.client) return {};
+    var out = {};
+    try {
+      var src = aw.client.headers;
+      if (src && typeof src === "object") {
+        Object.keys(src).forEach(function (k) {
+          if (src[k] != null && src[k] !== "") {
+            out[k] = String(src[k]);
+          }
+        });
+      }
+    } catch (e0) {
+      /* — */
+    }
+    try {
+      if (aw.client.config && aw.client.config.project) {
+        out["X-Appwrite-Project"] = String(aw.client.config.project);
+      }
+    } catch (e1) {
+      /* — */
+    }
+    try {
+      var fb = localStorage.getItem("cookieFallback");
+      if (fb) {
+        out["X-Fallback-Cookies"] = fb;
+      }
+    } catch (e2) {
+      /* — */
+    }
+    return out;
+  }
+
+  async function downloadReportPdfFromStorage(btn) {
+    const aw = getAw();
+    const bucketId = btn.getAttribute("data-bucket-id") || "";
+    const fileId = btn.getAttribute("data-file-id") || "";
+    const filename =
+      btn.getAttribute("data-download-name") || "3N_Rapor.pdf";
+    const fallbackUrl = btn.getAttribute("data-fallback-url") || "";
+    const safeName = /\.pdf$/i.test(filename) ? filename : filename + ".pdf";
+
+    if (!bucketId || !fileId || !aw || !aw.storage) {
+      if (fallbackUrl) {
+        window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+      }
+      return;
+    }
+
+    if (window.location.protocol === "file:") {
+      window.alert(
+        "PDF indirmek için sayfayı bir web adresinden veya yerel sunucudan (ör. Live Server) açın. file:// ile Appwrite güvenli indirmeyi engelleyebilir."
+      );
+      if (fallbackUrl) {
+        window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+      }
+      return;
+    }
+
+    btn.disabled = true;
+    const origHtml = btn.innerHTML;
+    btn.innerHTML =
+      '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> İndiriliyor…';
+
+    function openFallback() {
+      if (fallbackUrl) {
+        window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+      }
+    }
+
+    try {
+      var url = aw.storage.getFileDownload(bucketId, fileId);
+      var headers = appwriteClientFetchHeaders(aw);
+      var res = await fetch(url, {
+        method: "GET",
+        mode: "cors",
+        credentials: "include",
+        headers: headers,
+      });
+      if (!res.ok) {
+        throw new Error("HTTP " + res.status + " " + res.statusText);
+      }
+      var buf = await res.arrayBuffer();
+      if (!buf || buf.byteLength < 64) {
+        throw new Error("Dosya çok küçük veya boş.");
+      }
+      var head = new Uint8Array(buf.slice(0, 5));
+      var isPdf =
+        head[0] === 0x25 &&
+        head[1] === 0x50 &&
+        head[2] === 0x44 &&
+        head[3] === 0x46;
+      if (!isPdf) {
+        throw new Error(
+          "Sunucu PDF yerine hata döndü (izin veya Appwrite Web platform). Konsolu kontrol edin."
+        );
+      }
+      var blob = new Blob([buf], { type: "application/pdf" });
+      var blobUrl = window.URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = safeName;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.warn("[3N] PDF indirme:", err);
+      openFallback();
+      if (!fallbackUrl) {
+        window.alert(
+          "PDF indirilemedi: " +
+            (err && err.message ? err.message : String(err))
+        );
+      }
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
+
   function wireReportTableActions() {
     const tbody = document.getElementById("reportsTableBody");
     if (!tbody) return;
     tbody.addEventListener("click", function (e) {
+      const dlBtn = e.target.closest(
+        ".download-btn[data-bucket-id][data-file-id]"
+      );
+      if (dlBtn && !dlBtn.classList.contains("download-btn--disabled")) {
+        e.preventDefault();
+        downloadReportPdfFromStorage(dlBtn);
+        return;
+      }
+
       const delBtn = e.target.closest(".delete-report-btn");
       if (delBtn) {
         if (delBtn.disabled) return;
