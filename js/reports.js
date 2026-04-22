@@ -852,42 +852,11 @@
   }
 
   /**
-   * Appwrite istemcisinin gönderdiği başlıklarla GET (yalnızca ?project= olan <a> bazen 401/boş döner).
+   * PDF indir: Eskiden fetch + arrayBuffer tüm dosyayı bellekte bekletiyordu (büyük PDF’te dakikalarca «İndiriliyor…»).
+   * getFileDownload URL’si zaten ?project= içerir; tarayıcı doğrudan akış indirmesi başlatır — anında tepki, daha az RAM.
+   * Özel dosya adı sunucu Content-Disposition ile gelir; cross-origin’de download özniteliği yok sayılabilir.
    */
-  function appwriteClientFetchHeaders(aw) {
-    if (!aw || !aw.client) return {};
-    var out = {};
-    try {
-      var src = aw.client.headers;
-      if (src && typeof src === "object") {
-        Object.keys(src).forEach(function (k) {
-          if (src[k] != null && src[k] !== "") {
-            out[k] = String(src[k]);
-          }
-        });
-      }
-    } catch (e0) {
-      /* — */
-    }
-    try {
-      if (aw.client.config && aw.client.config.project) {
-        out["X-Appwrite-Project"] = String(aw.client.config.project);
-      }
-    } catch (e1) {
-      /* — */
-    }
-    try {
-      var fb = localStorage.getItem("cookieFallback");
-      if (fb) {
-        out["X-Fallback-Cookies"] = fb;
-      }
-    } catch (e2) {
-      /* — */
-    }
-    return out;
-  }
-
-  async function downloadReportPdfFromStorage(btn) {
+  function downloadReportPdfFromStorage(btn) {
     const aw = getAw();
     const bucketId = btn.getAttribute("data-bucket-id") || "";
     const fileId = btn.getAttribute("data-file-id") || "";
@@ -913,11 +882,6 @@
       return;
     }
 
-    btn.disabled = true;
-    const origHtml = btn.innerHTML;
-    btn.innerHTML =
-      '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> İndiriliyor…';
-
     function openFallback() {
       if (fallbackUrl) {
         window.open(fallbackUrl, "_blank", "noopener,noreferrer");
@@ -926,41 +890,21 @@
 
     try {
       var url = aw.storage.getFileDownload(bucketId, fileId);
-      var headers = appwriteClientFetchHeaders(aw);
-      var res = await fetch(url, {
-        method: "GET",
-        mode: "cors",
-        credentials: "include",
-        headers: headers,
-      });
-      if (!res.ok) {
-        throw new Error("HTTP " + res.status + " " + res.statusText);
+      if (!url || String(url).trim() === "") {
+        openFallback();
+        if (!fallbackUrl) {
+          window.alert("İndirme adresi oluşturulamadı.");
+        }
+        return;
       }
-      var buf = await res.arrayBuffer();
-      if (!buf || buf.byteLength < 64) {
-        throw new Error("Dosya çok küçük veya boş.");
-      }
-      var head = new Uint8Array(buf.slice(0, 5));
-      var isPdf =
-        head[0] === 0x25 &&
-        head[1] === 0x50 &&
-        head[2] === 0x44 &&
-        head[3] === 0x46;
-      if (!isPdf) {
-        throw new Error(
-          "Sunucu PDF yerine hata döndü (izin veya Appwrite Web platform). Konsolu kontrol edin."
-        );
-      }
-      var blob = new Blob([buf], { type: "application/pdf" });
-      var blobUrl = window.URL.createObjectURL(blob);
       var a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = safeName;
-      a.rel = "noopener";
+      a.href = url;
+      a.setAttribute("download", safeName);
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
       console.warn("[3N] PDF indirme:", err);
       openFallback();
@@ -970,10 +914,12 @@
             (err && err.message ? err.message : String(err))
         );
       }
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = origHtml;
     }
+
+    btn.disabled = true;
+    setTimeout(function () {
+      btn.disabled = false;
+    }, 600);
   }
 
   function wireReportTableActions() {
