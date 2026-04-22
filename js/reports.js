@@ -655,16 +655,28 @@
 
     var companies = [];
     try {
-      const companyRes = await aw.databases.listDocuments(
-        aw.DATABASE_ID,
-        aw.COLLECTION_COMPANIES,
-        [aw.Query.orderAsc("name"), aw.Query.limit(500)]
-      );
+      const companyRes = await (aw.withNetworkRetry
+        ? aw.withNetworkRetry(
+            function () {
+              return aw.databases.listDocuments(
+                aw.DATABASE_ID,
+                aw.COLLECTION_COMPANIES,
+                [aw.Query.orderAsc("name"), aw.Query.limit(500)]
+              );
+            },
+            { attempts: 4, baseDelayMs: 500 }
+          )
+        : aw.databases.listDocuments(
+            aw.DATABASE_ID,
+            aw.COLLECTION_COMPANIES,
+            [aw.Query.orderAsc("name"), aw.Query.limit(500)]
+          ));
       companies = aw.normalizeDocuments(companyRes.documents || []);
     } catch (e) {
       window.alert(
         "Şirket listesi yüklenemedi: " +
-          (e && e.message ? e.message : String(e))
+          (e && e.message ? e.message : String(e)) +
+          "\n\nAğ veya Appwrite Web platformu ayarını kontrol edin; geçici hata ise sayfayı yenileyin."
       );
     }
 
@@ -679,11 +691,22 @@
     fillUploadModalCompanies(companies);
 
     try {
-      const reportRes = await aw.databases.listDocuments(
-        aw.DATABASE_ID,
-        aw.COLLECTION_REPORTS,
-        [aw.Query.orderDesc("$createdAt"), aw.Query.limit(500)]
-      );
+      const reportRes = await (aw.withNetworkRetry
+        ? aw.withNetworkRetry(
+            function () {
+              return aw.databases.listDocuments(
+                aw.DATABASE_ID,
+                aw.COLLECTION_REPORTS,
+                [aw.Query.orderDesc("$createdAt"), aw.Query.limit(500)]
+              );
+            },
+            { attempts: 4, baseDelayMs: 500 }
+          )
+        : aw.databases.listDocuments(
+            aw.DATABASE_ID,
+            aw.COLLECTION_REPORTS,
+            [aw.Query.orderDesc("$createdAt"), aw.Query.limit(500)]
+          ));
       reportsCache = aw.normalizeDocuments(reportRes.documents || []);
     } catch (reportErr) {
       tbody.innerHTML =

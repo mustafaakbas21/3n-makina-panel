@@ -146,11 +146,22 @@
     }
 
     try {
-      const res = await aw.databases.listDocuments(
-        aw.DATABASE_ID,
-        aw.COLLECTION_COMPANIES,
-        [aw.Query.orderAsc("name"), aw.Query.limit(500)]
-      );
+      const res = await (aw.withNetworkRetry
+        ? aw.withNetworkRetry(
+            function () {
+              return aw.databases.listDocuments(
+                aw.DATABASE_ID,
+                aw.COLLECTION_COMPANIES,
+                [aw.Query.orderAsc("name"), aw.Query.limit(500)]
+              );
+            },
+            { attempts: 4, baseDelayMs: 500 }
+          )
+        : aw.databases.listDocuments(
+            aw.DATABASE_ID,
+            aw.COLLECTION_COMPANIES,
+            [aw.Query.orderAsc("name"), aw.Query.limit(500)]
+          ));
       companiesCache = aw.normalizeDocuments(res.documents || []);
     } catch (err) {
       var msg = err && err.message ? err.message : "Veri alınamadı.";

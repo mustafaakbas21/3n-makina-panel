@@ -69,6 +69,7 @@ function newUniqueFileId() {
   return generateFileId();
 }
 
+/** Appwrite Console → Settings → General → Project ID ile aynı olmalı (yanlış ID → Failed to fetch / 404). */
 const client = new Client()
   .setEndpoint("https://fra.cloud.appwrite.io/v1")
   .setProject("69dcde32001b4de0d04e");
@@ -213,6 +214,43 @@ function isConfigured() {
   return true;
 }
 
+/**
+ * Geçici «Failed to fetch» / HTTP2 / ağ kopması için birkaç deneme (Opera GX vb.).
+ * @param {() => Promise<unknown>} fn
+ * @param {{ attempts?: number, baseDelayMs?: number }} opts
+ */
+async function withNetworkRetry(fn, opts) {
+  var attempts = (opts && opts.attempts) || 4;
+  var base =
+    opts && opts.baseDelayMs != null ? Number(opts.baseDelayMs) : 450;
+  if (attempts < 1) attempts = 1;
+  var lastErr;
+  var i;
+  for (i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      var msg = e && e.message ? String(e.message) : String(e);
+      var transient =
+        msg.indexOf("Failed to fetch") !== -1 ||
+        msg.indexOf("NetworkError") !== -1 ||
+        msg.indexOf("QUIC_PROTOCOL_ERROR") !== -1 ||
+        msg.indexOf("ERR_HTTP2") !== -1 ||
+        msg.indexOf("ERR_NETWORK") !== -1 ||
+        msg.indexOf("Load failed") !== -1 ||
+        msg.indexOf("Network request failed") !== -1;
+      if (!transient || i === attempts - 1) {
+        throw e;
+      }
+      await new Promise(function (r) {
+        setTimeout(r, base * (i + 1));
+      });
+    }
+  }
+  throw lastErr;
+}
+
 window.__3nAppwrite = {
   client: client,
   account: account,
@@ -240,6 +278,7 @@ window.__3nAppwrite = {
   fetchStorageFileDownloadArrayBuffer: fetchStorageFileDownloadArrayBuffer,
   parseStorageFileFromViewUrl: parseStorageFileFromViewUrl,
   storageFilePermissionsReadAny: storageFilePermissionsReadAny,
+  withNetworkRetry: withNetworkRetry,
 };
 
 export { generateFileId, newUniqueFileId, isValidStorageFileId };

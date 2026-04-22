@@ -248,8 +248,10 @@
                   Başka bir sayfaya geçtiğinizde karekod tuvalden kalkar; yeni sayfada tekrar «Karekodu Yerleştir» kullanın.
                 </p>
               </div>
-              <div class="qr-studio-canvas-wrap">
-                <canvas id="pdfCanvas" width="800" height="1000" aria-label="Belge önizlemesi ve karekod"></canvas>
+              <div id="report-container" class="qr-report-container">
+                <div class="qr-studio-canvas-wrap">
+                  <canvas id="pdfCanvas" width="800" height="1000" aria-label="Belge önizlemesi ve karekod"></canvas>
+                </div>
               </div>
             </div>
 
@@ -270,12 +272,12 @@
   <script type="module" src="./js/appwrite-config.mjs"></script>
   <script defer src="./js/script.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script defer src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script defer src="./js/qr-generator.js"></script>
 </body>
 </html>
