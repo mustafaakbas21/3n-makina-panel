@@ -54,25 +54,29 @@
       background: #fff;
     }
 
-    /* html2pdf: A4 genişliği; yatay padding kaldırıldı — tuval tam sayfa genişliğinde rasterlenir */
+    /* html2pdf: A4 boyutunda tam sayfa - kayma olmadan */
     #report-container {
-      width: 210mm;
-      max-width: 100%;
+      width: 794px;
+      max-width: 794px;
+      min-height: 1123px;
       margin: 0 auto;
-      padding: 8mm 0;
+      padding: 0;
       box-sizing: border-box;
       background: #fff;
       overflow: visible;
+      position: relative;
     }
     #report-container .qr-studio-canvas-wrap {
-      width: 100%;
-      max-width: none;
+      width: 794px;
+      max-width: 794px;
+      height: 1123px;
       box-sizing: border-box;
+      position: relative;
     }
     #report-container .qr-studio-canvas-wrap canvas {
-      width: 100% !important;
-      max-width: none !important;
-      height: auto !important;
+      width: 794px !important;
+      max-width: 794px !important;
+      height: 1123px !important;
       display: block;
     }
     #report-container .qr-wrapper,
@@ -97,10 +101,10 @@
         position: absolute;
         left: 0;
         top: 0;
-        width: 210mm;
-        max-width: 100%;
+        width: 794px;
+        max-width: 794px;
         margin: 0;
-        padding: 8mm 0;
+        padding: 0;
         box-sizing: border-box;
         box-shadow: none;
       }

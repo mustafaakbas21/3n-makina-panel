@@ -142,7 +142,23 @@
   }
 
   /**
+   * Blob'dan PDF indirme
+   */
+  function downloadPdfBlob(blob, filename) {
+    if (!blob) return;
+    var url = window.URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename || "3N_Rapor.pdf";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  /**
    * #report-container (Fabric tuvali) → html2pdf → sıkıştırılmış PDF Blob.
+   * A4 boyutunda, çok sayfalı, kayma olmayan çıktı.
    */
   function buildQrPdfBlobHtml2Pdf(displayFilename) {
     return new Promise(function (resolve, reject) {
@@ -167,12 +183,6 @@
         }
       }
 
-      var captureW = Math.max(
-        A4_CONTENT_CSS_PX,
-        Math.ceil(el.scrollWidth || 0),
-        Math.ceil(el.offsetWidth || 0)
-      );
-
       var fname =
         displayFilename && String(displayFilename).trim()
           ? String(displayFilename).trim()
@@ -186,22 +196,26 @@
         filename: fname,
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
-          scale: 1.75,
+          scale: 2,
           useCORS: true,
           letterRendering: true,
           logging: false,
           backgroundColor: "#ffffff",
-          windowWidth: captureW,
+          width: 794,
+          height: 1123,
+          windowWidth: 794,
           scrollX: 0,
           scrollY: 0,
         },
         jsPDF: {
-          unit: "mm",
+          unit: "pt",
           format: "a4",
           orientation: "portrait",
           compress: true,
+          putOnlyUsedFonts: true,
+          floatPrecision: 16,
         },
-        pagebreak: { mode: ["legacy"] },
+        pagebreak: { mode: ['css'], before: '.page-break', after: '.page-break', avoid: 'canvas' },
       };
 
       requestAnimationFrame(function () {
@@ -974,8 +988,14 @@
 
             assignNewQrFileName();
 
+            try {
+              downloadPdfBlob(workflowPdfBlob, currentQrDisplayFileName);
+            } catch (dlErr) {
+              console.warn("PDF indirme hatası:", dlErr);
+            }
+
             window.alert(
-              "Rapor Deposu'na kaydedildi. PDF Appwrite Storage'da; listede dosya bağlantısı görünür.\n\nYeni belge için «Karekodu Yerleştir / Yenile» ile yeni depo adresi oluşturun."
+              "Rapor Deposu'na kaydedildi ve PDF indirildi. PDF Appwrite Storage'da; listede dosya bağlantısı görünür.\n\nYeni belge için «Karekodu Yerleştir / Yenile» ile yeni depo adresi oluşturun."
             );
           } finally {
             workflowPdfBlob = null;

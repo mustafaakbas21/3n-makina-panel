@@ -340,13 +340,13 @@
               ">" +
               "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
               "</span>"
-            : "<a class=\"download-btn\" href=\"" +
+            : "<button type=\"button\" class=\"download-btn\" data-download-url=\"" +
               downloadHrefEsc +
-              "\" download=\"" +
+              "\" data-download-name=\"" +
               downloadNameAttr +
-              "\" rel=\"noopener noreferrer\">" +
+              "\" title=\"PDF'i indir\">" +
               "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
-              "</a>") +
+              "</button>") +
           (!downloadDisabled && urlAttr
             ? "<a class=\"report-view-btn\" href=\"" +
               urlAttr +
@@ -842,6 +842,37 @@
     }
   }
 
+  async function downloadPdfFromUrl(url, filename, btn) {
+    if (!url) return;
+    if (btn) {
+      btn.disabled = true;
+      btn.dataset.originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> İndiriliyor...';
+    }
+    try {
+      const response = await fetch(url, { method: 'GET', mode: 'cors' });
+      if (!response.ok) {
+        throw new Error('İndirme başarısız: ' + response.status + ' ' + response.statusText);
+      }
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename || '3N_Rapor.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      window.alert('PDF indirilemedi: ' + (err && err.message ? err.message : String(err)));
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = btn.dataset.originalText || '<i class="fa-solid fa-download" aria-hidden="true"></i> İndir';
+      }
+    }
+  }
+
   function wireReportTableActions() {
     const tbody = document.getElementById("reportsTableBody");
     if (!tbody) return;
@@ -859,6 +890,14 @@
           return;
         }
         deleteReportDocument(docId, delBtn);
+        return;
+      }
+      const downloadBtn = e.target.closest(".download-btn[data-download-url]");
+      if (downloadBtn) {
+        e.preventDefault();
+        const url = downloadBtn.getAttribute("data-download-url");
+        const filename = downloadBtn.getAttribute("data-download-name") || "3N_Rapor.pdf";
+        downloadPdfFromUrl(url, filename, downloadBtn);
         return;
       }
     });
