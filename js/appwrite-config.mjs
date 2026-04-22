@@ -153,6 +153,32 @@ function getStorageFileViewUrl(bucketId, fileId) {
   return buildStorageFileViewUrl(bucketId, fileId);
 }
 
+/**
+ * Tarayıcıda doğrudan indirme (GET; fetch/blob yok). Rapor deposu «İndir» href’i.
+ */
+function buildStorageFileDownloadUrl(bucketId, fileId) {
+  if (!isValidStorageFileId(fileId)) {
+    return "";
+  }
+  try {
+    return storage.getFileDownload(bucketId, fileId);
+  } catch (e) {
+    var ep = String(client.config.endpoint || "").replace(/\/$/, "");
+    var pid = String(client.config.project || "");
+    var b = encodeURIComponent(String(bucketId));
+    var f = encodeURIComponent(String(fileId));
+    return (
+      ep +
+      "/storage/buckets/" +
+      b +
+      "/files/" +
+      f +
+      "/download?project=" +
+      encodeURIComponent(pid)
+    );
+  }
+}
+
 function extractFileIdFromStorageUploadResponse(uploadResult) {
   if (!uploadResult || typeof uploadResult !== "object") {
     return "";
@@ -287,6 +313,7 @@ window.__3nAppwrite = {
   newUniqueFileId: newUniqueFileId,
   isValidStorageFileId: isValidStorageFileId,
   buildStorageFileViewUrl: buildStorageFileViewUrl,
+  buildStorageFileDownloadUrl: buildStorageFileDownloadUrl,
   pdfViewUrlFromUploadResult: pdfViewUrlFromUploadResult,
   extractFileIdFromStorageUploadResponse: extractFileIdFromStorageUploadResponse,
   DATABASE_ID: DATABASE_ID,

@@ -171,155 +171,32 @@
     return !/^[a-zA-Z0-9_]+$/.test(fid);
   }
 
-  function sanitizeStorageFileLabel(raw) {
-    var s = String(raw || "Belge")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+  function shortSafeLabelForDownloadFilename(raw) {
+    var t = String(raw == null ? "" : raw).trim();
+    if (!t) t = "Rapor";
+    try {
+      t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    } catch (e0) {
+      /* — */
+    }
+    t = t
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9-]/g, "_")
       .replace(/_+/g, "_")
-      .replace(/^_|_$/g, "");
-    if (!s) s = "Belge";
-    return s.slice(0, 72);
+      .replace(/-+/g, "-")
+      .replace(/^[-_]+|[-_]+$/g, "");
+    if (!t || !t.replace(/[-_]/g, "")) t = "Rapor";
+    return t.substring(0, 20);
   }
 
-  /** İndirme ile kaydedilecek dosya adı: 3N_Makina_Raporu_{şirket|başlık}.pdf */
+  /** İndirme önerilen dosya adı: 3N_Rapor_{firma20}.pdf (QR stüdyosu ile uyumlu) */
   function friendlyDownloadFilenameForRow(row) {
     var company = companyNameForReport(row);
     var base =
       company && company !== "—"
         ? company
-        : rowVal(row, ["title"]) || "Belge";
-    return "3N_Makina_Raporu_" + sanitizeStorageFileLabel(base) + ".pdf";
-  }
-
-  function triggerPdfDownload(url, filename) {
-    var name =
-      filename && String(filename).trim()
-        ? String(filename).trim()
-        : "3N_Makina_Raporu.pdf";
-    var u = String(url || "").trim();
-    if (!u) return;
-    var uNorm = normalizeReportPdfUrl(u);
-
-    var aw = getAw();
-    var parsed =
-      aw && typeof aw.fetchStorageFileDownloadArrayBuffer === "function"
-        ? parseAppwriteStorageFileFromViewUrl(uNorm)
-        : null;
-
-    function saveBlob(blob) {
-      var a = document.createElement("a");
-      var obj = URL.createObjectURL(blob);
-      a.href = obj;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(obj);
-    }
-
-    if (parsed && aw.fetchStorageFileDownloadArrayBuffer) {
-      aw
-        .fetchStorageFileDownloadArrayBuffer(parsed.bucketId, parsed.fileId)
-        .then(function (buf) {
-          saveBlob(
-            new Blob([buf], {
-              type: "application/pdf",
-            })
-          );
-        })
-        .catch(function (err) {
-          console.warn("[3N] PDF indirme (Appwrite):", err);
-          fetch(uNorm, { mode: "cors", credentials: "include" })
-            .then(function (res) {
-              if (!res.ok) throw new Error("HTTP " + res.status);
-              return res.blob();
-            })
-            .then(saveBlob)
-            .catch(function () {
-              var a = document.createElement("a");
-              a.href = uNorm;
-              a.download = name;
-              a.target = "_blank";
-              a.rel = "noopener noreferrer";
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-            });
-        });
-      return;
-    }
-
-    fetch(uNorm, { mode: "cors", credentials: "include" })
-      .then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.blob();
-      })
-      .then(saveBlob)
-      .catch(function () {
-        var a = document.createElement("a");
-        a.href = uNorm;
-        a.download = name;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      });
-  }
-
-  function saveBlobAsDownload(blob, filename) {
-    var name =
-      filename && String(filename).trim()
-        ? String(filename).trim()
-        : "3N_Makina_Raporu.pdf";
-    var a = document.createElement("a");
-    var obj = URL.createObjectURL(blob);
-    a.href = obj;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    try {
-      URL.revokeObjectURL(obj);
-    } catch (revErr) {
-      /* — */
-    }
-  }
-
-  /**
-   * Rapor deposu: DB’deki bucket + dosya kimliği ile Appwrite Storage’dan binary çekip indirir.
-   */
-  function downloadReportFromStorage(bucketId, fileId, filename, fallbackViewUrl) {
-    var aw = getAw();
-    if (
-      !bucketId ||
-      !fileId ||
-      !aw ||
-      typeof aw.fetchStorageFileDownloadArrayBuffer !== "function"
-    ) {
-      if (fallbackViewUrl) {
-        triggerPdfDownload(fallbackViewUrl, filename);
-      }
-      return;
-    }
-    aw.fetchStorageFileDownloadArrayBuffer(bucketId, fileId)
-      .then(function (buf) {
-        saveBlobAsDownload(
-          new Blob([buf], { type: "application/pdf" }),
-          filename
-        );
-      })
-      .catch(function (err) {
-        console.warn("[3N] Storage indirme (SDK):", err);
-        if (fallbackViewUrl) {
-          triggerPdfDownload(fallbackViewUrl, filename);
-        } else {
-          window.alert(
-            "Dosya indirilemedi. Oturum veya Appwrite Storage izinlerini kontrol edin."
-          );
-        }
-      });
+        : rowVal(row, ["title"]) || "Rapor";
+    return "3N_Rapor_" + shortSafeLabelForDownloadFilename(base) + ".pdf";
   }
 
   function getSelectedCompanyId() {
@@ -407,21 +284,35 @@
           viewHref = normalizeReportPdfUrl(String(pdfUrl));
         }
         const urlAttr = viewHref ? escapeHtml(String(viewHref)) : "";
-        var storageDataAttrs = "";
-        if (stParts && stParts.bucketId && stParts.fileId) {
-          storageDataAttrs =
-            " data-storage-bucket=\"" +
-            escapeHtml(stParts.bucketId) +
-            "\" data-storage-file=\"" +
-            escapeHtml(stParts.fileId) +
-            "\"";
+        var downloadHrefRaw = "";
+        if (
+          stParts &&
+          stParts.bucketId &&
+          stParts.fileId &&
+          awRow &&
+          typeof awRow.buildStorageFileDownloadUrl === "function"
+        ) {
+          downloadHrefRaw =
+            awRow.buildStorageFileDownloadUrl(
+              stParts.bucketId,
+              stParts.fileId
+            ) || "";
         }
+        if (!downloadHrefRaw && pdfUrl && !downloadDisabled) {
+          downloadHrefRaw =
+            viewHref || normalizeReportPdfUrl(String(pdfUrl)) || "";
+        }
+        const downloadHrefEsc = downloadHrefRaw
+          ? escapeHtml(String(downloadHrefRaw))
+          : "";
         const downloadName = friendlyDownloadFilenameForRow(row);
         const downloadNameAttr = escapeHtml(downloadName);
         const brokenTitle =
           pdfUrl && isBrokenOrInvalidPdfUrl(String(pdfUrl))
             ? " title=\"PDF bağlantısı geçersiz (eski hatalı kayıt). Raporu silip dosyayı yeniden yükleyin.\""
             : "";
+        const downloadReady =
+          !downloadDisabled && String(downloadHrefRaw || "").trim() !== "";
 
         return (
           "<tr data-report-id=\"" +
@@ -443,18 +334,14 @@
           escapeHtml(fileType) +
           "</td>" +
           "<td class=\"data-table__actions\"><div class=\"report-actions\">" +
-          (downloadDisabled
+          (!downloadReady
             ? "<span class=\"download-btn download-btn--disabled\" aria-disabled=\"true\"" +
               brokenTitle +
               ">" +
               "<i class=\"fa-solid fa-download\" aria-hidden=\"true\"></i> İndir" +
               "</span>"
             : "<a class=\"download-btn\" href=\"" +
-              urlAttr +
-              "\"" +
-              storageDataAttrs +
-              " data-fallback-pdf=\"" +
-              urlAttr +
+              downloadHrefEsc +
               "\" download=\"" +
               downloadNameAttr +
               "\" rel=\"noopener noreferrer\">" +
@@ -926,10 +813,8 @@
       applyFiltersAndRender();
 
       if (pdfUrl && aw.storage) {
-        const parsed = parseAppwriteStorageFileFromViewUrl(
-          normalizeReportPdfUrl(String(pdfUrl))
-        );
-        if (parsed) {
+        const parsed = storageRefsFromPdfUrl(String(pdfUrl));
+        if (parsed && parsed.bucketId && parsed.fileId) {
           try {
             await aw.storage.deleteFile(parsed.bucketId, parsed.fileId);
           } catch (storageErr) {
@@ -964,23 +849,6 @@
         }
         deleteReportDocument(docId, delBtn);
         return;
-      }
-
-      const btn = e.target.closest(".download-btn");
-      if (!btn || btn.classList.contains("download-btn--disabled")) return;
-      e.preventDefault();
-      const name =
-        btn.getAttribute("download") || "3N_Makina_Raporu.pdf";
-      const bucket = btn.getAttribute("data-storage-bucket");
-      const fileId = btn.getAttribute("data-storage-file");
-      var fallback =
-        btn.getAttribute("data-fallback-pdf") || btn.getAttribute("href") || "";
-      if (bucket && fileId) {
-        downloadReportFromStorage(bucket, fileId, name, fallback.trim());
-        return;
-      }
-      if (fallback) {
-        triggerPdfDownload(fallback, name);
       }
     });
   }

@@ -49,15 +49,25 @@
     return t || "Belge";
   }
 
-  function sanitizeStorageFileLabel(raw) {
-    var s = String(raw || "Belge")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+  /**
+   * Firma adı → kısa güvenli dosya gövdesi (max 20, yalnız harf/rakam ve tire).
+   */
+  function shortSafeCompanyForPdfFilename(displayName) {
+    var raw = String(displayName == null ? "" : displayName).trim();
+    if (!raw) raw = "Rapor";
+    try {
+      raw = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    } catch (n0) {
+      /* — */
+    }
+    raw = raw
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9-]/g, "_")
       .replace(/_+/g, "_")
-      .replace(/^_|_$/g, "");
-    if (!s) s = "Belge";
-    return s.slice(0, 72);
+      .replace(/-+/g, "-")
+      .replace(/^[-_]+|[-_]+$/g, "");
+    if (!raw || !raw.replace(/[-_]/g, "")) raw = "Rapor";
+    return raw.substring(0, 20);
   }
 
   function assignNewQrFileName() {
@@ -68,9 +78,10 @@
         : aw && typeof aw.newUniqueFileId === "function"
           ? aw.newUniqueFileId()
           : "";
-    var firma = sanitizeStorageFileLabel(getQrStudioCompanyDisplayName());
-    currentQrDisplayFileName =
-      "3N_Makina_Raporu_" + firma + "_" + Date.now() + ".pdf";
+    var safeFirma = shortSafeCompanyForPdfFilename(
+      getQrStudioCompanyDisplayName()
+    );
+    currentQrDisplayFileName = "3N_Rapor_" + safeFirma + ".pdf";
   }
 
   function getPredictedPublicUrl() {
@@ -126,18 +137,6 @@
       return pdfOut;
     }
     return null;
-  }
-
-  /** Appwrite createFile için PDF File (binary; Base64 / DB’ye yazılmaz). */
-  function qrStudioPdfFileFromBlob(pdfBlob, displayName) {
-    var base =
-      displayName && String(displayName).trim()
-        ? String(displayName).trim()
-        : "3N_Rapor.pdf";
-    if (!/\.pdf$/i.test(base)) {
-      base += ".pdf";
-    }
-    return new File([pdfBlob], base, { type: "application/pdf" });
   }
 
   /**
@@ -847,10 +846,17 @@
             ) {
               throw new Error("PDF oluşturulamadı veya boş.");
             }
-            workflowPdfFile = qrStudioPdfFileFromBlob(
-              workflowPdfBlob,
-              currentQrDisplayFileName
-            );
+            var normForUpload = normalizePdfBlobForUpload(workflowPdfBlob);
+            if (!normForUpload || !(normForUpload instanceof Blob)) {
+              throw new Error("PDF blob normalize edilemedi.");
+            }
+            var uploadFileName = currentQrDisplayFileName;
+            if (!/\.pdf$/i.test(uploadFileName)) {
+              uploadFileName += ".pdf";
+            }
+            workflowPdfFile = new File([normForUpload], uploadFileName, {
+              type: "application/pdf",
+            });
 
             var bucketId = aw.BUCKET_REPORTS;
             var perms = aw.storageFilePermissionsReadAny;

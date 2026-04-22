@@ -520,6 +520,9 @@ function saveReportCalendarMarkersEntry(entry) {
 /** create-report.js / editor.js başarılı kayıttan sonra çağrılır */
 window.__3nSaveReportCalendarMarkers = function (entry) {
   saveReportCalendarMarkersEntry(entry);
+  if (document.getElementById("calendarGrid")) {
+    renderCalendar();
+  }
 };
 
 const calendarState = {
@@ -620,6 +623,75 @@ function buildUrgentInspectionItems(reports, companyById) {
     return a.diffDays - b.diffDays;
   });
   return out;
+}
+
+function formatMarkerAccordionDate(iso) {
+  if (!iso || typeof iso !== "string") return "—";
+  const head = iso.split("T")[0];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(head)) return String(iso);
+  return formatReportDate(head);
+}
+
+/**
+ * Takvimde yeşil/turuncu işaretlerin hangi rapora ait olduğunu listeler (localStorage işaretleri).
+ */
+function renderCalendarMarkersAccordion() {
+  const body = document.getElementById("calendarMarkersAccordionBody");
+  const countEl = document.getElementById("calendarMarkersAccordionCount");
+  if (!body) return;
+
+  const items = getReportCalendarMarkers();
+  if (countEl) {
+    countEl.textContent =
+      items.length > 0 ? "(" + items.length + ")" : "";
+  }
+
+  if (!items.length) {
+    body.innerHTML =
+      '<p class="calendar-markers-accordion__empty">Rapor veya QR kaydı sırasında seçtiğiniz <strong>ilk rapor</strong> ve <strong>son hatırlatıcı</strong> tarihleri burada görünür. Henüz kayıt yok.</p>';
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  items.forEach(function (it) {
+    const titleRaw =
+      it.title != null && String(it.title).trim()
+        ? String(it.title).trim()
+        : "Başlıksız rapor";
+    const row = document.createElement("div");
+    row.className = "calendar-markers-accordion__row";
+
+    const titleEl = document.createElement("div");
+    titleEl.className = "calendar-markers-accordion__title";
+    titleEl.textContent = titleRaw;
+
+    const dl = document.createElement("dl");
+    dl.className = "calendar-markers-accordion__dates";
+
+    const divFirst = document.createElement("div");
+    const dt1 = document.createElement("dt");
+    dt1.textContent = "İlk rapor";
+    const dd1 = document.createElement("dd");
+    dd1.textContent = formatMarkerAccordionDate(it.firstDate);
+    divFirst.appendChild(dt1);
+    divFirst.appendChild(dd1);
+
+    const divRem = document.createElement("div");
+    const dt2 = document.createElement("dt");
+    dt2.textContent = "Son hatırlatıcı";
+    const dd2 = document.createElement("dd");
+    dd2.textContent = formatMarkerAccordionDate(it.reminderDate);
+    divRem.appendChild(dt2);
+    divRem.appendChild(dd2);
+
+    dl.appendChild(divFirst);
+    dl.appendChild(divRem);
+    row.appendChild(titleEl);
+    row.appendChild(dl);
+    frag.appendChild(row);
+  });
+
+  body.replaceChildren(frag);
 }
 
 /**
@@ -727,6 +799,7 @@ function renderCalendar() {
   }
 
   grid.appendChild(frag);
+  renderCalendarMarkersAccordion();
 }
 
 function wireCalendarGridInteraction() {
@@ -1207,6 +1280,11 @@ document.addEventListener("DOMContentLoaded", function () {
       renderCalendar();
       wireCalendarNav();
       wireCalendarGridInteraction();
+      window.addEventListener("storage", function (e) {
+        if (e.key !== CALENDAR_MARKERS_STORAGE_KEY) return;
+        if (!document.getElementById("calendarGrid")) return;
+        renderCalendar();
+      });
       loadDashboardData();
     }
   } catch (e2) {

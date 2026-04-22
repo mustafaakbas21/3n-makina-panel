@@ -839,6 +839,103 @@ a.sidebar__logout {
   background: #ef4444;
 }
 
+.calendar-markers-accordion {
+  margin-top: 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  background: var(--bg-page, #f8fafc);
+  overflow: hidden;
+}
+
+.calendar-markers-accordion__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text, #0f172a);
+  list-style: none;
+}
+
+.calendar-markers-accordion__summary::-webkit-details-marker {
+  display: none;
+}
+
+.calendar-markers-accordion__summary-main {
+  flex: 1;
+}
+
+.calendar-markers-accordion__count {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted, #64748b);
+}
+
+.calendar-markers-accordion__chev {
+  font-size: 0.65rem;
+  color: var(--text-muted, #64748b);
+  transition: transform 0.2s ease;
+}
+
+.calendar-markers-accordion[open] .calendar-markers-accordion__chev {
+  transform: rotate(180deg);
+}
+
+.calendar-markers-accordion__body {
+  padding: 0 0.75rem 0.75rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.calendar-markers-accordion__empty {
+  margin: 0.65rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+  line-height: 1.45;
+}
+
+.calendar-markers-accordion__row {
+  padding: 0.65rem 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.calendar-markers-accordion__row:last-child {
+  border-bottom: none;
+}
+
+.calendar-markers-accordion__title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text, #0f172a);
+  margin-bottom: 0.4rem;
+}
+
+.calendar-markers-accordion__dates {
+  display: grid;
+  gap: 0.35rem 1rem;
+  margin: 0;
+  font-size: 0.76rem;
+}
+
+.calendar-markers-accordion__dates > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+}
+
+.calendar-markers-accordion__dates dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+}
+
+.calendar-markers-accordion__dates dd {
+  margin: 0;
+  color: var(--text, #0f172a);
+}
+
 /* Yaklaşan denetimler */
 .upcoming-widget__list {
   list-style: none;
