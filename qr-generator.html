@@ -68,7 +68,7 @@
       padding: 0;
       box-sizing: border-box;
       background: #fff;
-      overflow: hidden;
+      overflow: visible;
       position: relative;
       display: flex;
       align-items: center;
@@ -102,29 +102,6 @@
     @page {
       size: A4 portrait;
       margin: 0;
-    }
-    @media print {
-      body * {
-        visibility: hidden;
-      }
-      #report-container,
-      #report-container * {
-        visibility: visible;
-      }
-      #report-container {
-        position: fixed;
-        left: 0;
-        top: 0;
-        width: 794px;
-        height: 1123px;
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-        box-shadow: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
     }
 
     .qr-studio-loading__track {
