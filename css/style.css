@@ -1854,6 +1854,10 @@ a.sidebar__logout {
   box-sizing: border-box;
 }
 
+.data-table--reports a.download-btn:visited {
+  color: var(--accent);
+}
+
 .data-table--reports .download-btn:hover:not(.download-btn--disabled) {
   background: #dbeafe;
   box-shadow: 0 2px 10px rgba(37, 99, 235, 0.18);
