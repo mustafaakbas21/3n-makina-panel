@@ -90,6 +90,28 @@ function normalizeDocuments(docs) {
  * İstemci ile aynı endpoint/project; örnek:
  * {endpoint}/storage/buckets/{bucketId}/files/{fileId}/view?project={projectId}
  */
+/**
+ * Kayıtlı pdfUrl / view veya download adresinden bucket + fileId.
+ */
+function parseStorageFileFromViewUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  const m = String(url).trim().match(/\/storage\/buckets\/([^/]+)\/files\/([^/?#]+)/i);
+  if (!m) return null;
+  var bid = m[1];
+  var fid = m[2];
+  try {
+    bid = decodeURIComponent(bid);
+  } catch (e1) {
+    /* — */
+  }
+  try {
+    fid = decodeURIComponent(fid);
+  } catch (e2) {
+    /* — */
+  }
+  return { bucketId: bid, fileId: fid };
+}
+
 function buildStorageFileViewUrl(bucketId, fileId) {
   if (!isValidStorageFileId(fileId)) {
     return "";
@@ -140,6 +162,24 @@ function pdfViewUrlFromUploadResult(bucketId, uploadResult) {
   return buildStorageFileViewUrl(bucketId, fid);
 }
 
+/**
+ * Depo / rapor sayfaları: tarayıcı fetch’i Appwrite başlıkları olmadan 4xx verir.
+ * SDK’nın aynı origin + başlıklarla GET’i — tek ağ gidişi, özelleşmiş dosya adı için blob.
+ * @param {string} bucketId
+ * @param {string} fileId
+ * @returns {Promise<ArrayBuffer>}
+ */
+function fetchStorageFileDownloadArrayBuffer(bucketId, fileId) {
+  var urlStr = storage.getFileDownload(bucketId, fileId);
+  return client.call(
+    "get",
+    new URL(urlStr),
+    {},
+    {},
+    "arrayBuffer"
+  );
+}
+
 function blobToFile(blob, filename) {
   return new File([blob], filename, {
     type: (blob && blob.type) || "application/octet-stream",
@@ -180,6 +220,8 @@ window.__3nAppwrite = {
   normalizeDocuments: normalizeDocuments,
   getStorageFileViewUrl: getStorageFileViewUrl,
   blobToFile: blobToFile,
+  fetchStorageFileDownloadArrayBuffer: fetchStorageFileDownloadArrayBuffer,
+  parseStorageFileFromViewUrl: parseStorageFileFromViewUrl,
 };
 
 export { generateFileId, newUniqueFileId, isValidStorageFileId };

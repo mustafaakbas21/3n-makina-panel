@@ -110,9 +110,8 @@
   }
 
   /**
-   * Rapor deposu (reports.js) ile aynı: depodaki PDF URL’sini fetch + blob ile indirir.
-   * Uzun async zincirinden sonra blob: URL ile programatik indirme çoğu tarayıcıda engellenebildiği için
-   * yükleme sonrası publicUrl kullanılır.
+   * Rapor deposu (reports.js) ile aynı: Appwrite dosyası için SDK GET (X-Appwrite-Project) + blob;
+   * düz fetch başlıksız kaldığı için 4xx verir, yedek `<a download>` farklı kökende işe yaramaz.
    */
   function triggerPdfDownload(url, filename) {
     if (!url || !String(url).trim()) return;
@@ -120,24 +119,68 @@
       filename && String(filename).trim()
         ? String(filename).trim()
         : "3N_Makina_Raporu.pdf";
-    fetch(String(url).trim(), { mode: "cors", credentials: "include" })
+    var u = String(url).trim();
+
+    var aw = getAw();
+    var parsed =
+      aw &&
+      typeof aw.fetchStorageFileDownloadArrayBuffer === "function" &&
+      typeof aw.parseStorageFileFromViewUrl === "function"
+        ? aw.parseStorageFileFromViewUrl(u)
+        : null;
+
+    function saveBlob(blob) {
+      var a = document.createElement("a");
+      var obj = URL.createObjectURL(blob);
+      a.href = obj;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(obj);
+    }
+
+    if (parsed && aw.fetchStorageFileDownloadArrayBuffer) {
+      aw
+        .fetchStorageFileDownloadArrayBuffer(parsed.bucketId, parsed.fileId)
+        .then(function (buf) {
+          saveBlob(
+            new Blob([buf], {
+              type: "application/pdf",
+            })
+          );
+        })
+        .catch(function (err) {
+          console.warn("[3N] PDF indirme (Appwrite):", err);
+          fetch(u, { mode: "cors", credentials: "include" })
+            .then(function (res) {
+              if (!res.ok) throw new Error("HTTP " + res.status);
+              return res.blob();
+            })
+            .then(saveBlob)
+            .catch(function () {
+              var a = document.createElement("a");
+              a.href = u;
+              a.download = name;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            });
+        });
+      return;
+    }
+
+    fetch(u, { mode: "cors", credentials: "include" })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.blob();
       })
-      .then(function (blob) {
-        var a = document.createElement("a");
-        var u = URL.createObjectURL(blob);
-        a.href = u;
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(u);
-      })
+      .then(saveBlob)
       .catch(function () {
         var a = document.createElement("a");
-        a.href = String(url).trim();
+        a.href = u;
         a.download = name;
         a.target = "_blank";
         a.rel = "noopener noreferrer";
