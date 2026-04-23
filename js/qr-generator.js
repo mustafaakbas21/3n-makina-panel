@@ -92,6 +92,8 @@
 
   /** Storage fileId — QR ile yüklemede aynı kimlik kullanılır */
   let currentQrStorageId = "";
+  /** createDocument için önceden seçilen belge $id — karekod rapor.html?id=... ile aynı olmalı */
+  let qrPlannedDocumentId = "";
   /** PDF dosya adı (Appwrite File.name) */
   let currentQrDisplayFileName = "";
 
@@ -150,12 +152,25 @@
       getQrStudioCompanyDisplayName()
     );
     currentQrDisplayFileName = "3N_Rapor_" + safeFirma + ".pdf";
+    qrPlannedDocumentId = "";
   }
 
-  function getPredictedPublicUrl() {
-    const aw = getAw();
-    if (!aw || !currentQrStorageId) return "";
-    return aw.getStorageFileViewUrl(aw.BUCKET_REPORTS, currentQrStorageId);
+  /**
+   * Karekod: doğrudan Storage değil; rapor.html üzerinden güncel pdfUrl’e yönlendirme.
+   */
+  function buildRaporRouterUrl(documentId) {
+    var id = String(documentId || "").trim();
+    if (!id) return "";
+    var loc = window.location;
+    var path = loc.pathname || "";
+    var i = path.lastIndexOf("/");
+    var basePath = i >= 0 ? path.slice(0, i + 1) : "/";
+    return (
+      loc.origin +
+      basePath +
+      "rapor.html?id=" +
+      encodeURIComponent(id)
+    );
   }
 
   function getPdfJs() {
@@ -420,6 +435,7 @@
     qrFabricImage = null;
     lastQrDataUrl = "";
     qrOverlayPdfPage = 0;
+    qrPlannedDocumentId = "";
   }
 
   function clearPdfSession() {
@@ -863,61 +879,6 @@
     });
   }
 
-  /**
-   * Appwrite upload sonrası gelen tam view URL ile karekodu yeniler; konum/ölçek korunur (PDF yeniden üretimi için).
-   */
-  async function replaceFabricQrOverlayFromDataUrl(dataUrl) {
-    if (!fabricCanvas || !qrFabricImage || !dataUrl) {
-      return;
-    }
-    var prev = {
-      left: qrFabricImage.left,
-      top: qrFabricImage.top,
-      scaleX: qrFabricImage.scaleX,
-      scaleY: qrFabricImage.scaleY,
-      angle: qrFabricImage.angle || 0,
-      originX: qrFabricImage.originX || "center",
-      originY: qrFabricImage.originY || "center",
-    };
-    return new Promise(function (resolve, reject) {
-      try {
-        fabricCanvas.remove(qrFabricImage);
-      } catch (rm) {
-        /* — */
-      }
-      qrFabricImage = null;
-      fabric.Image.fromURL(
-        dataUrl,
-        function (img) {
-          if (!fabricCanvas) {
-            reject(new Error("Tuval yok."));
-            return;
-          }
-          img.set(
-            Object.assign({}, prev, {
-              cornerSize: 12,
-              transparentCorners: false,
-              borderColor: "#2563eb",
-              cornerColor: "#2563eb",
-              name: "qrOverlay",
-              objectCaching: false,
-              lockUniScaling: true,
-              centeredScaling: true,
-              lockScalingFlip: true,
-            })
-          );
-          fabricCanvas.add(img);
-          fabricCanvas.setActiveObject(img);
-          img.setCoords();
-          qrFabricImage = img;
-          fabricCanvas.requestRenderAll();
-          resolve();
-        },
-        { crossOrigin: "anonymous" }
-      );
-    });
-  }
-
   async function addQrToCanvas() {
     if (!fabricCanvas) {
       window.alert("Önce bir belge yükleyin.");
@@ -934,11 +895,25 @@
       return;
     }
 
-    const url = getPredictedPublicUrl().trim();
-    if (!url) {
+    qrPlannedDocumentId =
+      aw && typeof aw.newUniqueFileId === "function"
+        ? aw.newUniqueFileId()
+        : "";
+    if (
+      !qrPlannedDocumentId ||
+      (aw.isValidStorageFileId &&
+        !aw.isValidStorageFileId(qrPlannedDocumentId))
+    ) {
       window.alert(
-        "Kalıcı dosya adresi oluşturulamadı. «Karekodu Yerleştir» öncesi Appwrite ve depo kimliğini kontrol edin."
+        "Rapor yönlendirme kimliği oluşturulamadı. Sayfayı yenileyip tekrar deneyin."
       );
+      qrPlannedDocumentId = "";
+      return;
+    }
+    const url = buildRaporRouterUrl(qrPlannedDocumentId).trim();
+    if (!url) {
+      window.alert("Yönlendirme adresi oluşturulamadı.");
+      qrPlannedDocumentId = "";
       return;
     }
 
@@ -1062,6 +1037,16 @@
       window.alert("Geçersiz depo dosya kimliği. Karekodu yenileyin.");
       return;
     }
+    if (
+      !qrPlannedDocumentId ||
+      (aw.isValidStorageFileId &&
+        !aw.isValidStorageFileId(qrPlannedDocumentId))
+    ) {
+      window.alert(
+        "Rapor yönlendirme kimliği yok. «Karekodu Yerleştir / Yenile» ile karekodu yeniden ekleyin."
+      );
+      return;
+    }
 
     setLoading(true, "Depo bağlantısı kontrol ediliyor…", true);
 
@@ -1160,7 +1145,7 @@
               throw new Error("Depo yükleme yanıtı geçersiz veya boş.");
             }
 
-            setLoading(true, "Karekod bağlantısı doğrulanıyor…", true);
+            setLoading(true, "Depo görüntüleme adresi kesinleştiriliyor…", true);
 
             var canonicalPdfUrl = String(
               aw.pdfViewUrlFromUploadResult(bucketId, uploadResult) || ""
@@ -1168,79 +1153,6 @@
             if (!canonicalPdfUrl) {
               throw new Error(
                 "Yükleme yanıtında geçerli dosya kimliği ($id) yok; Storage URL oluşturulamadı."
-              );
-            }
-
-            lastQrDataUrl = await generateQrDataUrlFromText(canonicalPdfUrl);
-            await replaceFabricQrOverlayFromDataUrl(lastQrDataUrl);
-
-            setLoading(true, "PDF (karekod eşleşmesi) yeniden üretiliyor…", true);
-            workflowPdfBlob = await buildQrPdfBlobHtml2Pdf(
-              currentQrDisplayFileName
-            );
-            if (
-              !workflowPdfBlob ||
-              !(workflowPdfBlob instanceof Blob) ||
-              workflowPdfBlob.size < 64
-            ) {
-              throw new Error("Güncellenmiş PDF oluşturulamadı veya boş.");
-            }
-            normForUpload = normalizePdfBlobForUpload(workflowPdfBlob);
-            if (!normForUpload || !(normForUpload instanceof Blob)) {
-              throw new Error("Güncellenmiş PDF blob normalize edilemedi.");
-            }
-            workflowPdfFile = new File([normForUpload], uploadFileName, {
-              type: "application/pdf",
-            });
-
-            setLoading(true, "Depoda PDF güncelleniyor…", true);
-            if (typeof storageApi.deleteFile === "function") {
-              try {
-                await storageApi.deleteFile(bucketId, fileIdForUpload);
-              } catch (delErr) {
-                console.warn(
-                  "[3N] Depo dosyası silinemedi (yeniden yükleme öncesi):",
-                  delErr
-                );
-              }
-            }
-            try {
-              uploadResult = await oneUpload();
-            } catch (up2) {
-              var msg2 = up2 && up2.message ? String(up2.message) : "";
-              if (
-                msg2.indexOf("fetch") !== -1 ||
-                msg2.indexOf("Failed to fetch") !== -1 ||
-                msg2.indexOf("network") !== -1 ||
-                msg2.indexOf("QUIC") !== -1 ||
-                msg2.indexOf("HTTP2") !== -1
-              ) {
-                await new Promise(function (r) {
-                  setTimeout(r, 1200);
-                });
-                uploadResult = await oneUpload();
-              } else {
-                throw up2;
-              }
-            }
-
-            if (!uploadResult || typeof uploadResult !== "object") {
-              throw new Error("İkinci depo yükleme yanıtı geçersiz veya boş.");
-            }
-
-            var publicUrlAfterSecond = String(
-              aw.pdfViewUrlFromUploadResult(bucketId, uploadResult) || ""
-            ).trim();
-            if (!publicUrlAfterSecond) {
-              throw new Error(
-                "İkinci yüklemede görüntüleme URL oluşturulamadı."
-              );
-            }
-            if (publicUrlAfterSecond !== canonicalPdfUrl) {
-              console.warn(
-                "[3N] pdfUrl ikinci yüklemede farklı (DB yine karekod ile aynı tutulur):",
-                canonicalPdfUrl,
-                publicUrlAfterSecond
               );
             }
 
@@ -1259,7 +1171,7 @@
               return aw.databases.createDocument(
                 aw.DATABASE_ID,
                 aw.COLLECTION_REPORTS,
-                aw.newUniqueFileId(),
+                qrPlannedDocumentId,
                 insertPayload
               );
             }
@@ -1286,6 +1198,16 @@
                 : createdQrReportDoc.id != null
                   ? String(createdQrReportDoc.id)
                   : "");
+            if (
+              newQrReportId &&
+              String(qrPlannedDocumentId).trim() !== String(newQrReportId).trim()
+            ) {
+              console.warn(
+                "[3N] Beklenen belge $id ile yanıt farklı:",
+                qrPlannedDocumentId,
+                newQrReportId
+              );
+            }
             if (typeof window.__3nSaveReportCalendarMarkers === "function") {
               window.__3nSaveReportCalendarMarkers({
                 firstDate: calDates.firstDate,
