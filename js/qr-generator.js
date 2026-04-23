@@ -90,9 +90,9 @@
   /** Kaynak karekod rasterı (px); PDF’te PNG ile basıldığı için yüksek = daha keskin modüller */
   const QR_SOURCE_SIZE = 640;
 
-  /** Storage fileId — QR ile yüklemede aynı kimlik kullanılır */
+  /** Storage fileId — QR ile yüklemede aynı kimlik kullanılır (Appwrite view URL’de files/{bu id}) */
   let currentQrStorageId = "";
-  /** createDocument için önceden seçilen belge $id — karekod rapor.html?id=... ile aynı olmalı */
+  /** createDocument için önceden seçilen belge $id (karekod metni artık doğrudan Storage view; bu yalnızca DB) */
   let qrPlannedDocumentId = "";
   /** PDF dosya adı (Appwrite File.name) */
   let currentQrDisplayFileName = "";
@@ -156,20 +156,31 @@
   }
 
   /**
-   * Karekod: doğrudan Storage değil; rapor.html üzerinden güncel pdfUrl’e yönlendirme.
+   * QR: Appwrite Cloud Storage file view (cloud.appwrite.io; project/bucket appwrite-config ile aynı).
+   * Yükleme createFile(fileId) ile aynı kimlik kullanıldığında uploadResult.$id ile birebir eşleşir.
    */
-  function buildRaporRouterUrl(documentId) {
-    var id = String(documentId || "").trim();
-    if (!id) return "";
-    var loc = window.location;
-    var path = loc.pathname || "";
-    var i = path.lastIndexOf("/");
-    var basePath = i >= 0 ? path.slice(0, i + 1) : "/";
+  function buildAppwriteCloudQrViewUrl(aw, fileId) {
+    var fid = String(fileId || "").trim();
+    if (!fid) return "";
+    var bid =
+      aw && aw.BUCKET_REPORTS != null
+        ? String(aw.BUCKET_REPORTS).trim()
+        : aw && typeof aw.getStorageBucketId === "function"
+          ? String(aw.getStorageBucketId() || "").trim()
+          : "";
+    var pid =
+      aw && aw.client && aw.client.config && aw.client.config.project
+        ? String(aw.client.config.project).trim()
+        : "";
+    if (!bid || !pid) return "";
+    if (aw.isValidStorageFileId && !aw.isValidStorageFileId(fid)) return "";
     return (
-      loc.origin +
-      basePath +
-      "rapor.html?id=" +
-      encodeURIComponent(id)
+      "https://cloud.appwrite.io/v1/storage/buckets/" +
+      encodeURIComponent(bid) +
+      "/files/" +
+      encodeURIComponent(fid) +
+      "/view?project=" +
+      encodeURIComponent(pid)
     );
   }
 
@@ -905,14 +916,16 @@
         !aw.isValidStorageFileId(qrPlannedDocumentId))
     ) {
       window.alert(
-        "Rapor yönlendirme kimliği oluşturulamadı. Sayfayı yenileyip tekrar deneyin."
+        "Rapor belge kimliği oluşturulamadı. Sayfayı yenileyip tekrar deneyin."
       );
       qrPlannedDocumentId = "";
       return;
     }
-    const url = buildRaporRouterUrl(qrPlannedDocumentId).trim();
+    const url = buildAppwriteCloudQrViewUrl(aw, currentQrStorageId).trim();
     if (!url) {
-      window.alert("Yönlendirme adresi oluşturulamadı.");
+      window.alert(
+        "Appwrite görüntüleme adresi oluşturulamadı (proje veya depo kimliği). appwrite-config.mjs’i kontrol edin."
+      );
       qrPlannedDocumentId = "";
       return;
     }
@@ -1043,7 +1056,7 @@
         !aw.isValidStorageFileId(qrPlannedDocumentId))
     ) {
       window.alert(
-        "Rapor yönlendirme kimliği yok. «Karekodu Yerleştir / Yenile» ile karekodu yeniden ekleyin."
+        "Rapor belge kimliği yok. «Karekodu Yerleştir / Yenile» ile karekodu yeniden ekleyin."
       );
       return;
     }
@@ -1143,6 +1156,23 @@
 
             if (!uploadResult || typeof uploadResult !== "object") {
               throw new Error("Depo yükleme yanıtı geçersiz veya boş.");
+            }
+
+            var qrLink = buildAppwriteCloudQrViewUrl(aw, uploadResult.$id);
+            if (!String(qrLink || "").trim()) {
+              throw new Error(
+                "Yükleme yanıtı alındı ancak karekod (cloud.appwrite.io) görüntüleme adresi oluşturulamadı."
+              );
+            }
+            if (
+              String(qrLink) !==
+              String(buildAppwriteCloudQrViewUrl(aw, currentQrStorageId) || "")
+            ) {
+              console.warn(
+                "[3N] Depo yanıtındaki $id, PDF karekodundaki depo dosya kimliğiyle aynı değil; PDF’i yeniden üretin veya karekodu yenileyin.",
+                uploadResult && uploadResult.$id,
+                currentQrStorageId
+              );
             }
 
             setLoading(true, "Depo görüntüleme adresi kesinleştiriliyor…", true);
